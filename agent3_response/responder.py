@@ -27,7 +27,7 @@ CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.6"))
 # effect as empty results from Agent 2.
 MIN_USABLE_CHUNKS = 1
 
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.0-flash")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.6-flash")
 
 REFUSAL_TEXT = (
     "I don't have information on this in the knowledge base available to you. "
@@ -163,9 +163,23 @@ def analyze_and_respond(agent2_output: Agent2Output) -> Agent3Output:
     citations = _citations_from_chunk_ids(chunks_used, usable_chunks)
     unused_ids = [c.chunk_id for c in usable_chunks if c.chunk_id not in chunks_used]
 
+    answer_text = llm_result.get("answer")
+    if not answer_text:
+        # grounded=True but no usable answer text — malformed model output,
+        # fail safe instead of crashing or returning an empty answer.
+        return Agent3Output(
+            session_id=agent2_output.session_id,
+            answer_text=REFUSAL_TEXT,
+            grounded=False,
+            citations=[],
+            chunks_used=[],
+            chunks_discarded=discarded_ids + [c.chunk_id for c in usable_chunks],
+            synthesis_notes="Malformed model output: grounded=True but no answer text; refused as fail-safe.",
+        )
+
     return Agent3Output(
         session_id=agent2_output.session_id,
-        answer_text=llm_result["answer"],
+        answer_text=answer_text,
         grounded=True,
         citations=citations,
         chunks_used=chunks_used,
@@ -175,12 +189,28 @@ def analyze_and_respond(agent2_output: Agent2Output) -> Agent3Output:
 
 
 if __name__ == "__main__":
-    # Quick manual smoke test — mirrors the shape of a real Agent2Output.
+    # Quick manual smoke test with a real chunk — exercises the actual Gemini call.
     mock_agent2_output = Agent2Output(
-        session_id="sess_TEST01",
+        session_id="sess_TEST02",
         query_used="What documents do I need to open a savings account?",
         access_level="public",
-        results=[],
-        retrieval_confidence="low",
+        results=[
+            RetrievedChunk(
+                doc_id="doc_001",
+                doc_title="Savings Account Guide",
+                chunk_id="doc_001_c01",
+                chunk_text=(
+                    "To open a savings account, customers need a valid NIC "
+                    "or passport, proof of address, and an initial deposit "
+                    "of LKR 1,000."
+                ),
+                similarity_score=0.91,
+                doc_access_level="public",
+                doc_version="v1",
+                effective_date="2025-01-01",
+                source_section="Section 2.1",
+            )
+        ],
+        retrieval_confidence="high",
     )
     print(analyze_and_respond(mock_agent2_output))
