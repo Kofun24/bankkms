@@ -1,5 +1,5 @@
 python-dotenv
-google-generativeai
+google-genai
 chromadb
 sentence-transformers
 fastapi
