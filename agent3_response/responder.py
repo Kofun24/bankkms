@@ -9,6 +9,7 @@ refuse rather than fall back on general LLM knowledge.
 
 import json
 import os
+import time
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -81,17 +82,29 @@ def _build_user_prompt(query: str, chunks: list[RetrievedChunk]) -> str:
     return "\n\n".join(lines)
 
 
-def _call_llm(user_prompt: str) -> dict:
-    response = _client.models.generate_content(
-        model=LLM_MODEL,
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            response_mime_type="application/json",
-            max_output_tokens=1000,
-        ),
-    )
-    return json.loads(response.text)
+def _call_llm(user_prompt: str, max_retries: int = 3) -> dict:
+    """Calls Gemini, retrying on transient 503/UNAVAILABLE errors with
+    exponential backoff (1s, 2s, 4s). Non-transient errors fail immediately."""
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            response = _client.models.generate_content(
+                model=LLM_MODEL,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    response_mime_type="application/json",
+                    max_output_tokens=1000,
+                ),
+            )
+            return json.loads(response.text)
+        except Exception as exc:
+            last_exc = exc
+            if "503" in str(exc) or "UNAVAILABLE" in str(exc):
+                time.sleep(2 ** attempt)  # 1s, 2s, 4s
+                continue
+            raise  # non-503 errors fail immediately, no point retrying
+    raise last_exc
 
 
 def _citations_from_chunk_ids(

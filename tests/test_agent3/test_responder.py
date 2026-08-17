@@ -1,8 +1,8 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
-from agent3_response.responder import analyze_and_respond
+from agent3_response.responder import analyze_and_respond, _call_llm
 from shared.schemas import Agent2Output, RetrievedChunk
 
 
@@ -175,6 +175,49 @@ class TestMalformedLLMOutput:
         assert result.grounded is False
         assert result.citations == []
         assert "malformed" in result.synthesis_notes.lower()
+
+
+class TestRetryLogic:
+    """_call_llm should retry transient 503s with backoff, but fail fast on
+    anything else. time.sleep is mocked so these tests don't actually wait."""
+
+    def test_retries_on_503_then_succeeds(self):
+        mock_response = MagicMock()
+        mock_response.text = '{"answer": "ok", "grounded": true, "chunks_used": ["doc_001_c01"], "synthesis_notes": null}'
+
+        with patch("agent3_response.responder._client") as mock_client, \
+             patch("agent3_response.responder.time.sleep") as mock_sleep:
+            mock_client.models.generate_content.side_effect = [
+                Exception("503 UNAVAILABLE"),
+                Exception("503 UNAVAILABLE"),
+                mock_response,
+            ]
+            result = _call_llm("some prompt")
+
+        assert result["grounded"] is True
+        assert mock_client.models.generate_content.call_count == 3
+        assert mock_sleep.call_count == 2  # slept before retry 2 and 3
+
+    def test_exhausts_retries_and_raises(self):
+        with patch("agent3_response.responder._client") as mock_client, \
+             patch("agent3_response.responder.time.sleep"):
+            mock_client.models.generate_content.side_effect = Exception("503 UNAVAILABLE")
+
+            with pytest.raises(Exception, match="503"):
+                _call_llm("some prompt", max_retries=3)
+
+        assert mock_client.models.generate_content.call_count == 3
+
+    def test_non_503_error_fails_immediately_no_retry(self):
+        with patch("agent3_response.responder._client") as mock_client, \
+             patch("agent3_response.responder.time.sleep") as mock_sleep:
+            mock_client.models.generate_content.side_effect = Exception("400 INVALID_ARGUMENT")
+
+            with pytest.raises(Exception, match="400"):
+                _call_llm("some prompt")
+
+        assert mock_client.models.generate_content.call_count == 1
+        mock_sleep.assert_not_called()
 
 
 class TestOutputContract:
