@@ -70,8 +70,30 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
 
 
 if __name__ == "__main__":
+    import json
+
     # Manual smoke test — run: python pipeline.py
     register_session("demo_session", UserRole.CUSTOMER)
 
     result = run_pipeline("demo_session", "What documents do I need to open a savings account?")
-    print(result)
+
+    print("\n--- Pipeline Result ---")
+    print(f"Status:        {result['status']}")
+    print(f"Message:       {result['message_to_user']}")
+
+    if "agent1_output" in result:
+        a1 = result["agent1_output"]
+        print("\n--- Agent 1 Output ---")
+        print(f"Session ID:      {a1.session_id}")
+        print(f"User Role:       {a1.user_role.value}")
+        print(f"Access Level:    {a1.access_level.value}")
+        print(f"Intent:          {a1.intent.value}")
+        print(f"Topic:           {a1.topic}")
+        print(f"Normalized Query:{a1.normalized_query}")
+        print(f"Confidence:      {a1.confidence}")
+        print(f"Needs Clarify?:  {a1.needs_clarification}")
+        print(f"Clarify Q:       {a1.clarifying_question}")
+        print(f"Suspicious?:     {a1.flags.suspicious_input}")
+        print(f"Injection Flag?: {a1.flags.possible_injection_attempt}")
+        print(f"Timestamp:       {a1.timestamp}")
+    print("------------------------\n")
