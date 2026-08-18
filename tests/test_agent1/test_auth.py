@@ -68,10 +68,10 @@ def test_role_maps_to_correct_access_level(store, role, expected_access):
 
 # ---------- Error cases ----------
 
-def test_unknown_session_raises(store):
-    with pytest.raises(UnknownSessionError):
-        store.get_role("sess_does_not_exist")
-
+def test_get_role_returns_none_for_unknown_session(store):
+    # get_role() is now a plain lookup — it returns None rather than raising.
+    # Raising is resolve_access()'s job, and only when allow_anonymous=False.
+    assert store.get_role("sess_does_not_exist") is None
 
 def test_invalid_role_raises_on_register(store):
     with pytest.raises(UnauthorizedRoleError):
@@ -81,8 +81,7 @@ def test_invalid_role_raises_on_register(store):
 def test_end_session_removes_access(store):
     store.register_session("sess_4", UserRole.CUSTOMER)
     store.end_session("sess_4")
-    with pytest.raises(UnknownSessionError):
-        store.get_role("sess_4")
+    assert store.get_role("sess_4") is None
 
 
 def test_ending_nonexistent_session_does_not_raise(store):
@@ -160,3 +159,53 @@ def test_flags_case_insensitive_role_claim():
         actual_role=UserRole.CUSTOMER,
     )
     assert result is True
+
+    # ---------- Anonymous customer access ----------
+
+def test_anonymous_session_auto_provisioned_as_customer():
+    from agent1_classification.auth import resolve_access
+    import agent1_classification.auth as auth_module
+    auth_module._session_store = SessionStore()  # isolate from other tests
+
+    ctx = resolve_access("anon_sess_1", allow_anonymous=True)
+
+    assert ctx.user_role == UserRole.CUSTOMER
+    assert ctx.access_level == AccessLevel.PUBLIC
+    assert ctx.anonymous is True
+
+
+def test_anonymous_flag_false_for_preregistered_session():
+    from agent1_classification.auth import resolve_access, register_session
+    import agent1_classification.auth as auth_module
+    auth_module._session_store = SessionStore()
+
+    register_session("emp_sess_1", UserRole.EMPLOYEE)
+    ctx = resolve_access("emp_sess_1", allow_anonymous=True)
+
+    assert ctx.anonymous is False
+    assert ctx.user_role == UserRole.EMPLOYEE
+    assert ctx.access_level == AccessLevel.INTERNAL
+
+
+def test_anonymous_not_allowed_by_default_still_raises():
+    from agent1_classification.auth import resolve_access
+    import agent1_classification.auth as auth_module
+    auth_module._session_store = SessionStore()
+
+    # allow_anonymous defaults to False — employee/compliance entry points
+    # rely on this to enforce login is mandatory for them.
+    with pytest.raises(UnknownSessionError):
+        resolve_access("no_such_session")
+
+
+def test_anonymous_session_reused_returns_same_role():
+    from agent1_classification.auth import resolve_access
+    import agent1_classification.auth as auth_module
+    auth_module._session_store = SessionStore()
+
+    ctx1 = resolve_access("anon_sess_2", allow_anonymous=True)
+    ctx2 = resolve_access("anon_sess_2", allow_anonymous=True)
+
+    assert ctx1.user_role == ctx2.user_role == UserRole.CUSTOMER
+    assert ctx1.anonymous is True
+    assert ctx2.anonymous is False  # already provisioned on second call, no longer "new"
