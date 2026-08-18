@@ -5,3 +5,6 @@ sentence-transformers
 fastapi
 uvicorn
 pydantic
+scikit-learn
+pyyaml
+python-dotenv
