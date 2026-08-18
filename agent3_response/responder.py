@@ -19,17 +19,15 @@ from google.genai import types
 
 from shared.schemas import Agent2Output, Agent3Output, Citation, RetrievedChunk
 
-# Chunks below this similarity score are treated as noise and discarded
-# before they ever reach the LLM prompt. Shared across agents via .env —
-# if this was meant to be Agent-4-only, split it into its own var instead.
+# Filter out chunks below the required confidence level
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.6"))
 
-# Below this many usable chunks, don't even attempt synthesis — same
-# effect as empty results from Agent 2.
+# Minimum number of usable chunks required for answering
 MIN_USABLE_CHUNKS = 1
 
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.6-flash")
 
+# Response returned when there is not enough reliable information
 REFUSAL_TEXT = (
     "I don't have information on this in the knowledge base available to you. "
     "I can't answer from general knowledge — please rephrase your question or "
@@ -38,6 +36,7 @@ REFUSAL_TEXT = (
 
 _client = genai.Client(api_key=os.getenv("LLM_API_KEY"))
 
+# Instructions that ensure the LLM only uses retrieved knowledge
 SYSTEM_PROMPT = """You are the Knowledge Analysis & Response agent in a bank's \
 internal knowledge system. You must answer STRICTLY and ONLY using the \
 numbered source chunks provided below. Do not use any outside knowledge, \
@@ -61,6 +60,7 @@ in this exact shape:
 """
 
 
+# Filter retrieved chunks based on similarity score
 def _filter_chunks(
     results: list[RetrievedChunk],
 ) -> tuple[list[RetrievedChunk], list[str]]:
@@ -70,6 +70,7 @@ def _filter_chunks(
     return usable, discarded
 
 
+# Prepare the retrieved chunks as an LLM prompt
 def _build_user_prompt(query: str, chunks: list[RetrievedChunk]) -> str:
     lines = [f'User question: "{query}"', "", "Source chunks:"]
     for i, c in enumerate(chunks, start=1):
@@ -82,6 +83,7 @@ def _build_user_prompt(query: str, chunks: list[RetrievedChunk]) -> str:
     return "\n\n".join(lines)
 
 
+# Call Gemini and retry temporary service failures
 def _call_llm(user_prompt: str, max_retries: int = 3) -> dict:
     """Calls Gemini, retrying on transient 503/UNAVAILABLE errors with
     exponential backoff (1s, 2s, 4s). Non-transient errors fail immediately."""
@@ -107,6 +109,7 @@ def _call_llm(user_prompt: str, max_retries: int = 3) -> dict:
     raise last_exc
 
 
+# Convert LLM-selected chunk IDs into citations
 def _citations_from_chunk_ids(
     chunk_ids: list[str], chunks: list[RetrievedChunk]
 ) -> list[Citation]:
@@ -130,8 +133,10 @@ def _citations_from_chunk_ids(
 def analyze_and_respond(agent2_output: Agent2Output) -> Agent3Output:
     """Main entry point for Agent 3."""
 
+    # Filter retrieved results based on confidence
     usable_chunks, discarded_ids = _filter_chunks(agent2_output.results)
 
+    # Refuse if there is not enough reliable evidence
     if len(usable_chunks) < MIN_USABLE_CHUNKS:
         return Agent3Output(
             session_id=agent2_output.session_id,
@@ -143,8 +148,10 @@ def analyze_and_respond(agent2_output: Agent2Output) -> Agent3Output:
             synthesis_notes="No chunks met the confidence threshold; refused rather than guessing.",
         )
 
+    # Build the prompt and send the evidence to Gemini
     user_prompt = _build_user_prompt(agent2_output.query_used, usable_chunks)
 
+    # Fail safely if the LLM call or response parsing fails
     try:
         llm_result = _call_llm(user_prompt)
     except (json.JSONDecodeError, Exception) as exc:
@@ -158,9 +165,11 @@ def analyze_and_respond(agent2_output: Agent2Output) -> Agent3Output:
             synthesis_notes=f"LLM call/parse failed, refused as fail-safe: {exc}",
         )
 
+    # Check whether the LLM considers the answer grounded
     grounded = bool(llm_result.get("grounded", False))
     chunks_used = llm_result.get("chunks_used", [])
 
+    # Refuse if the answer is not properly grounded
     if not grounded or not chunks_used:
         return Agent3Output(
             session_id=agent2_output.session_id,
@@ -173,6 +182,7 @@ def analyze_and_respond(agent2_output: Agent2Output) -> Agent3Output:
             or "Model reported insufficient grounding.",
         )
 
+    # Generate citations from the chunks used by the LLM
     citations = _citations_from_chunk_ids(chunks_used, usable_chunks)
     unused_ids = [c.chunk_id for c in usable_chunks if c.chunk_id not in chunks_used]
 
@@ -190,6 +200,7 @@ def analyze_and_respond(agent2_output: Agent2Output) -> Agent3Output:
             synthesis_notes="Malformed model output: grounded=True but no answer text; refused as fail-safe.",
         )
 
+    # Return the final grounded response
     return Agent3Output(
         session_id=agent2_output.session_id,
         answer_text=answer_text,
@@ -202,6 +213,7 @@ def analyze_and_respond(agent2_output: Agent2Output) -> Agent3Output:
 
 
 if __name__ == "__main__":
+    # Simple manual test using a sample Agent 2 response
     # Quick manual smoke test with a real chunk — exercises the actual Gemini call.
     mock_agent2_output = Agent2Output(
         session_id="sess_TEST02",

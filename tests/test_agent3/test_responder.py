@@ -6,6 +6,7 @@ from agent3_response.responder import analyze_and_respond, _call_llm
 from shared.schemas import Agent2Output, RetrievedChunk
 
 
+# Create a sample retrieved chunk for testing
 def _make_chunk(chunk_id="doc_001_c01", similarity=0.91):
     return RetrievedChunk(
         doc_id="doc_001",
@@ -20,6 +21,7 @@ def _make_chunk(chunk_id="doc_001_c01", similarity=0.91):
     )
 
 
+# Create a sample Agent 2 output for testing
 def _make_agent2_output(results=None, session_id="sess_TEST"):
     return Agent2Output(
         session_id=session_id,
@@ -33,12 +35,14 @@ def _make_agent2_output(results=None, session_id="sess_TEST"):
 class TestGroundingRefusal:
     """Agent 3 must refuse rather than fall back to general knowledge."""
 
+    # Test refusal when no chunks are retrieved
     def test_empty_results_refuses(self):
         result = analyze_and_respond(_make_agent2_output(results=[]))
         assert result.grounded is False
         assert result.citations == []
         assert "don't have information" in result.answer_text.lower()
 
+    # Test that low-confidence chunks are filtered before the LLM call
     def test_low_similarity_chunk_is_discarded_and_refuses(self):
         # Below CONFIDENCE_THRESHOLD (default 0.6) — should never reach the LLM.
         low_score_chunk = _make_chunk(similarity=0.3)
@@ -48,6 +52,7 @@ class TestGroundingRefusal:
         assert result.grounded is False
         assert "doc_001_c01" in result.chunks_discarded
 
+    # Test refusal when the LLM reports insufficient grounding
     def test_llm_reports_ungrounded_still_refuses(self):
         chunk = _make_chunk()
         with patch("agent3_response.responder._call_llm") as mock_llm:
@@ -61,6 +66,7 @@ class TestGroundingRefusal:
         assert result.grounded is False
         assert result.citations == []
 
+    # Test fail-safe behaviour when the LLM call fails
     def test_llm_error_fails_safe(self):
         chunk = _make_chunk()
         with patch("agent3_response.responder._call_llm", side_effect=Exception("503 UNAVAILABLE")):
@@ -72,6 +78,7 @@ class TestGroundingRefusal:
 class TestGroundedAnswer:
     """When the LLM does have grounded evidence, citations must map correctly."""
 
+    # Test that a valid grounded answer receives the correct citation
     def test_successful_grounded_answer_has_matching_citation(self):
         chunk = _make_chunk(chunk_id="doc_001_c01")
         with patch("agent3_response.responder._call_llm") as mock_llm:
@@ -89,6 +96,7 @@ class TestGroundedAnswer:
         assert result.citations[0].chunk_id == "doc_001_c01"
         assert result.citations[0].section == "Section 2.1"
 
+    # Test that invented chunk IDs are never included in citations
     def test_hallucinated_chunk_id_is_never_cited(self):
         """If the LLM claims a chunk_id that wasn't actually retrieved, it must
         not appear in citations — this is the anti-hallucination guard."""
@@ -106,6 +114,7 @@ class TestGroundedAnswer:
         assert "doc_999_fake" not in cited_ids
         assert cited_ids == ["doc_001_c01"]
 
+    # Test that chunks not used by the LLM are marked as discarded
     def test_unused_chunks_are_marked_discarded(self):
         chunk1 = _make_chunk(chunk_id="doc_001_c01")
         chunk2 = _make_chunk(chunk_id="doc_001_c02")
@@ -121,6 +130,7 @@ class TestGroundedAnswer:
         assert "doc_001_c02" in result.chunks_discarded
         assert "doc_001_c02" not in result.chunks_used
 
+    # Test that all chunks used for synthesis are properly cited
     def test_multi_chunk_synthesis_cites_all_used_chunks(self):
         chunk1 = _make_chunk(chunk_id="doc_001_c01")
         chunk2 = _make_chunk(chunk_id="doc_001_c02")
@@ -138,6 +148,7 @@ class TestGroundedAnswer:
         assert result.chunks_discarded == []
         assert result.synthesis_notes is not None
 
+    # Test that filtered low-confidence chunks cannot be cited
     def test_discarded_low_similarity_chunk_cannot_be_cited(self):
         """A chunk filtered out BEFORE the prompt (low similarity) must never
         end up in citations, even if the LLM somehow references its id."""
@@ -162,6 +173,7 @@ class TestGroundedAnswer:
 class TestMalformedLLMOutput:
     """The model can return valid JSON with an unexpected shape — must fail safe."""
 
+    # Test refusal when the LLM marks the answer grounded but provides no answer
     def test_grounded_true_but_missing_answer_key_refuses(self):
         chunk = _make_chunk()
         with patch("agent3_response.responder._call_llm") as mock_llm:
@@ -181,6 +193,7 @@ class TestRetryLogic:
     """_call_llm should retry transient 503s with backoff, but fail fast on
     anything else. time.sleep is mocked so these tests don't actually wait."""
 
+    # Test that temporary 503 errors are retried before succeeding
     def test_retries_on_503_then_succeeds(self):
         mock_response = MagicMock()
         mock_response.text = '{"answer": "ok", "grounded": true, "chunks_used": ["doc_001_c01"], "synthesis_notes": null}'
@@ -198,6 +211,7 @@ class TestRetryLogic:
         assert mock_client.models.generate_content.call_count == 3
         assert mock_sleep.call_count == 2  # slept before retry 2 and 3
 
+    # Test that the function raises after all retries are exhausted
     def test_exhausts_retries_and_raises(self):
         with patch("agent3_response.responder._client") as mock_client, \
              patch("agent3_response.responder.time.sleep"):
@@ -208,6 +222,7 @@ class TestRetryLogic:
 
         assert mock_client.models.generate_content.call_count == 3
 
+    # Test that non-503 errors fail immediately without retrying
     def test_non_503_error_fails_immediately_no_retry(self):
         with patch("agent3_response.responder._client") as mock_client, \
              patch("agent3_response.responder.time.sleep") as mock_sleep:
@@ -223,10 +238,12 @@ class TestRetryLogic:
 class TestOutputContract:
     """Every output must always carry session_id and timestamp per interfaces.md."""
 
+    # Test that the session ID from Agent 2 is preserved in Agent 3
     def test_session_id_propagates_through(self):
         result = analyze_and_respond(_make_agent2_output(results=[], session_id="sess_XYZ"))
         assert result.session_id == "sess_XYZ"
 
+    # Test that the Agent 3 output contains a timestamp
     def test_timestamp_is_present(self):
         result = analyze_and_respond(_make_agent2_output(results=[]))
         assert result.timestamp is not None
