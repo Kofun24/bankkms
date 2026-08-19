@@ -6,3 +6,6 @@ fastapi
 uvicorn
 pydantic
 pytest
+scikit-learn
+pyyaml
+python-dotenv

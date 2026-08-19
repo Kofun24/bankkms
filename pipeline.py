@@ -16,9 +16,14 @@ from agent1_classification.auth import (
 )
 from agent1_classification.classifier import classify_query
 from agent1_classification.gemini_classifier import gemini_classify
+from agent2_retrieval.retriever import Agent2Retriever
 from shared.enums import UserRole
-from shared.schemas import Agent1Output
+from shared.schemas import Agent1Output, Agent2Output
 
+# Instantiated once at import time — loading the embedder + vector store on
+# every query would be wasteful. Requires `python -m agent2_retrieval.ingest`
+# to have been run at least once so the index exists on disk.
+_agent2 = Agent2Retriever()
 
 def run_pipeline(session_id: str, raw_query: str) -> dict:
     """
@@ -51,8 +56,7 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
             "message_to_user": agent1_output.clarifying_question,
         }
 
-    # TODO (Agent 2 owner): call knowledge retrieval here
-    # agent2_output = retrieve_knowledge(agent1_output)
+    agent2_output: Agent2Output = _agent2.run(agent1_output)
 
     # TODO (Agent 3 owner): call response synthesis here
     # agent3_output = generate_response(agent2_output)
@@ -62,6 +66,7 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
 
     return {
         "agent1_output": agent1_output,
+        "agent2_output": agent2_output,
         "status": "classified_awaiting_retrieval",
         "message_to_user": (
             "Query classified successfully. Retrieval pipeline not yet connected."
@@ -70,8 +75,42 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
 
 
 if __name__ == "__main__":
+    import json
+
     # Manual smoke test — run: python pipeline.py
     register_session("demo_session", UserRole.CUSTOMER)
 
     result = run_pipeline("demo_session", "What documents do I need to open a savings account?")
-    print(result)
+
+    print("\n--- Pipeline Result ---")
+    print(f"Status:        {result['status']}")
+    print(f"Message:       {result['message_to_user']}")
+
+    if "agent1_output" in result:
+        a1 = result["agent1_output"]
+        print("\n--- Agent 1 Output ---")
+        print(f"Session ID:      {a1.session_id}")
+        print(f"User Role:       {a1.user_role.value}")
+        print(f"Access Level:    {a1.access_level.value}")
+        print(f"Intent:          {a1.intent.value}")
+        print(f"Topic:           {a1.topic}")
+        print(f"Normalized Query:{a1.normalized_query}")
+        print(f"Confidence:      {a1.confidence}")
+        print(f"Needs Clarify?:  {a1.needs_clarification}")
+        print(f"Clarify Q:       {a1.clarifying_question}")
+        print(f"Suspicious?:     {a1.flags.suspicious_input}")
+        print(f"Injection Flag?: {a1.flags.possible_injection_attempt}")
+        print(f"Timestamp:       {a1.timestamp}")
+
+    if "agent2_output" in result:
+        a2 = result["agent2_output"]
+        print("\n--- Agent 2 Output ---")
+        print(f"Query Used:          {a2.query_used}")
+        print(f"Reformulated?:       {a2.reformulated}")
+        print(f"Retrieval Attempts:  {a2.retrieval_attempts}")
+        print(f"Retrieval Confidence:{a2.retrieval_confidence.value}")
+        print(f"Access Filter Applied: {a2.access_filter_applied}")
+        print(f"Results ({len(a2.results)}):")
+        for r in a2.results:
+            print(f"  - [{r.doc_access_level.value}] {r.doc_title} / {r.source_section} (score={r.similarity_score})")
+    print("------------------------\n")
