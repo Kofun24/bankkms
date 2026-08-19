@@ -130,10 +130,13 @@ def test_normal_query_not_flagged():
 
 # ---------- Error propagation from auth.py ----------
 
-def test_unknown_session_raises():
-    with pytest.raises(UnknownSessionError):
-        classify_query("sess_never_registered", "What is my balance?")
+def test_unregistered_session_auto_provisioned_as_anonymous_customer():
+    # classify_query() allows anonymous access by design — an unregistered
+    # session is no longer an error, it's treated as a new public customer.
+    result = classify_query("sess_never_registered", "What is my balance?")
 
+    assert result.user_role == UserRole.CUSTOMER
+    assert result.access_level == AccessLevel.PUBLIC
 
 # ---------- Custom classifier_fn override ----------
 
