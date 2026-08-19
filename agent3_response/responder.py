@@ -25,7 +25,7 @@ CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.6"))
 # Minimum number of usable chunks required for answering
 MIN_USABLE_CHUNKS = 1
 
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.6-flash")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-flash-lite-latest")
 
 # Response returned when there is not enough reliable information
 REFUSAL_TEXT = (
