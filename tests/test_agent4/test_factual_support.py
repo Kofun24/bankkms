@@ -17,6 +17,7 @@ from agent4_verification.verifier import (
     check_factual_support,
     llm_factual_support_check,
 )
+from shared.enums import FactualSupportCheck
 
 
 # --------------------------------------------------------------------------
@@ -26,7 +27,7 @@ from agent4_verification.verifier import (
 def test_no_citations_fails_without_calling_llm(make_agent3_output):
     agent3 = make_agent3_output(citations=[], chunks_used=[])
     verdict, confidence = check_factual_support(agent3, {})
-    assert (verdict, confidence) == ("fail", 0.0)
+    assert (verdict, confidence) == (FactualSupportCheck.FAIL, 0.0)
 
 
 def test_chunks_used_not_subset_of_cited_fails_fast(
@@ -41,7 +42,7 @@ def test_chunks_used_not_subset_of_cited_fails_fast(
     )
     lookup = {happy_path["chunk"].chunk_id: happy_path["chunk"]}
     verdict, confidence = check_factual_support(agent3, lookup)
-    assert (verdict, confidence) == ("fail", 0.0)
+    assert (verdict, confidence) == (FactualSupportCheck.FAIL, 0.0)
 
 
 def test_valid_citations_reach_the_llm_layer(happy_path):
@@ -50,7 +51,7 @@ def test_valid_citations_reach_the_llm_layer(happy_path):
     short-circuiting."""
     lookup = {happy_path["chunk"].chunk_id: happy_path["chunk"]}
     verdict, confidence = check_factual_support(happy_path["agent3"], lookup)
-    assert verdict == "pass"  # fallback heuristic: has chunk_texts -> pass, low confidence
+    assert verdict == FactualSupportCheck.PASS  # fallback: has chunk_texts -> pass, low confidence
     assert confidence == 0.5
 
 
@@ -60,7 +61,7 @@ def test_valid_citations_reach_the_llm_layer(happy_path):
 
 def test_fallback_fails_with_no_chunk_texts():
     verdict, confidence = llm_factual_support_check("some answer", [])
-    assert (verdict, confidence) == ("fail", 0.0)
+    assert (verdict, confidence) == (FactualSupportCheck.FAIL, 0.0)
 
 
 def test_fallback_passes_with_low_confidence_when_chunks_present():
@@ -71,7 +72,7 @@ def test_fallback_passes_with_low_confidence_when_chunks_present():
     verdict, confidence = llm_factual_support_check(
         "The minimum balance is LKR 1,000.", ["chunk text here"]
     )
-    assert (verdict, confidence) == ("pass", 0.5)
+    assert (verdict, confidence) == (FactualSupportCheck.PASS, 0.5)
 
 
 # --------------------------------------------------------------------------
@@ -83,7 +84,7 @@ def test_gemini_pass_verdict_is_parsed(fake_gemini):
     verdict, confidence = llm_factual_support_check(
         "The minimum balance is LKR 1,000.", ["The minimum balance is LKR 1,000."]
     )
-    assert verdict == "pass"
+    assert verdict == FactualSupportCheck.PASS
     assert confidence == 0.93
 
 
@@ -92,37 +93,37 @@ def test_gemini_fail_verdict_is_parsed(fake_gemini):
     verdict, confidence = llm_factual_support_check(
         "The minimum balance is LKR 5,000.", ["The minimum balance is LKR 1,000."]
     )
-    assert verdict == "fail"
+    assert verdict == FactualSupportCheck.FAIL
     assert confidence == 0.2
 
 
 def test_gemini_response_wrapped_in_markdown_fences_is_still_parsed(fake_gemini):
     fake_gemini('```json\n{"verdict": "pass", "confidence": 0.8, "reason": "ok"}\n```')
     verdict, confidence = llm_factual_support_check("answer", ["chunk"])
-    assert verdict == "pass"
+    assert verdict == FactualSupportCheck.PASS
     assert confidence == 0.8
 
 
 def test_gemini_malformed_json_fails_closed(fake_gemini):
     fake_gemini("this is not json at all")
     verdict, confidence = llm_factual_support_check("answer", ["chunk"])
-    assert (verdict, confidence) == ("fail", 0.0)
+    assert (verdict, confidence) == (FactualSupportCheck.FAIL, 0.0)
 
 
 def test_gemini_invalid_verdict_string_defaults_to_fail(fake_gemini):
     fake_gemini('{"verdict": "maybe", "confidence": 0.9, "reason": "unclear"}')
     verdict, confidence = llm_factual_support_check("answer", ["chunk"])
-    assert verdict == "fail"
+    assert verdict == FactualSupportCheck.FAIL
     assert confidence == 0.9  # confidence is still parsed even if verdict is coerced
 
 
 def test_gemini_missing_fields_default_safely(fake_gemini):
     fake_gemini("{}")
     verdict, confidence = llm_factual_support_check("answer", ["chunk"])
-    assert verdict == "fail"
+    assert verdict == FactualSupportCheck.FAIL
     assert confidence == 0.0
 
 
 def test_gemini_exception_fails_closed(failing_gemini):
     verdict, confidence = llm_factual_support_check("answer", ["chunk"])
-    assert (verdict, confidence) == ("fail", 0.0)
+    assert (verdict, confidence) == (FactualSupportCheck.FAIL, 0.0)

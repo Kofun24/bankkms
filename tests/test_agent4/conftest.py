@@ -3,6 +3,10 @@ tests/test_agent4/conftest.py
 
 Shared fixtures for Agent 4 (Verification & Governance) tests.
 
+Builds real shared.schemas / shared.enums objects (the same contracts
+Agents 1-3 actually produce), not local stand-ins -- so these tests catch
+real integration breakage, not just Agent 4's internal logic in isolation.
+
 Key thing these fixtures solve: `llm_factual_support_check` calls out to
 Gemini. We never want real tests hitting a real API, so every test gets
 `no_gemini` (client forced to None -> fallback heuristic) unless it
@@ -15,10 +19,11 @@ from __future__ import annotations
 import pytest
 
 import agent4_verification.verifier as verifier
-from agent4_verification.verifier import (
+from shared.enums import AccessLevel, Intent, RetrievalConfidence, UserRole
+from shared.schemas import (
+    Agent1Output,
     Agent2Output,
     Agent3Output,
-    Agent4Input,
     Citation,
     RetrievedChunk,
 )
@@ -96,7 +101,7 @@ def failing_gemini(monkeypatch):
 
 
 # --------------------------------------------------------------------------
-# Domain object factories
+# Domain object factories (real shared.schemas / shared.enums types)
 # --------------------------------------------------------------------------
 
 @pytest.fixture
@@ -107,7 +112,7 @@ def make_chunk():
         chunk_id="doc_001_c03",
         chunk_text="The minimum balance for a standard savings account is LKR 1,000.",
         similarity_score=0.91,
-        doc_access_level="public",
+        doc_access_level=AccessLevel.PUBLIC,
         doc_version="v1",
         effective_date="2024-06-01",
         source_section="Section 2.1",
@@ -143,15 +148,41 @@ def make_citation():
 
 
 @pytest.fixture
+def make_agent1_output():
+    def _make(
+        session_id="sess_test",
+        user_role=UserRole.CUSTOMER,
+        access_level=AccessLevel.PUBLIC,
+        intent=Intent.ACCOUNT_INFO,
+        topic="savings_account",
+        normalized_query="What is the minimum balance for a savings account?",
+        confidence=0.9,
+    ) -> Agent1Output:
+        return Agent1Output(
+            session_id=session_id,
+            user_role=user_role,
+            access_level=access_level,
+            intent=intent,
+            topic=topic,
+            normalized_query=normalized_query,
+            confidence=confidence,
+        )
+
+    return _make
+
+
+@pytest.fixture
 def make_agent2_output():
     def _make(
         session_id="sess_test",
-        access_level="public",
+        query_used="minimum balance savings account",
+        access_level=AccessLevel.PUBLIC,
         results=None,
-        retrieval_confidence="high",
+        retrieval_confidence=RetrievalConfidence.HIGH,
     ) -> Agent2Output:
         return Agent2Output(
             session_id=session_id,
+            query_used=query_used,
             access_level=access_level,
             results=results or [],
             retrieval_confidence=retrieval_confidence,
@@ -181,39 +212,21 @@ def make_agent3_output():
 
 
 @pytest.fixture
-def make_agent4_input():
-    def _make(
-        session_id="sess_test",
-        user_role="customer",
-        access_level="public",
-        agent2_output=None,
-        agent3_output=None,
-    ) -> Agent4Input:
-        return Agent4Input(
-            session_id=session_id,
-            user_role=user_role,
-            access_level=access_level,
-            agent2_output=agent2_output,
-            agent3_output=agent3_output,
-        )
-
-    return _make
-
-
-@pytest.fixture
-def happy_path(make_chunk, make_citation, make_agent2_output, make_agent3_output, make_agent4_input):
+def happy_path(
+    make_chunk, make_citation, make_agent1_output, make_agent2_output, make_agent3_output
+):
     """A minimal, fully-consistent public-tier scenario: one chunk, one
     citation, chunk used, no conflicts. Individual tests mutate copies of
     this rather than rebuilding it from scratch."""
     chunk = make_chunk()
     citation = make_citation()
+    agent1 = make_agent1_output()
     agent2 = make_agent2_output(results=[chunk])
     agent3 = make_agent3_output(citations=[citation], chunks_used=[chunk.chunk_id])
-    payload = make_agent4_input(agent2_output=agent2, agent3_output=agent3)
     return {
         "chunk": chunk,
         "citation": citation,
+        "agent1": agent1,
         "agent2": agent2,
         "agent3": agent3,
-        "payload": payload,
     }

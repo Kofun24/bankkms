@@ -2,20 +2,23 @@
 Agent 4 — access re-confirmation check.
 
 This is the hard security gate: every cited chunk's doc_access_level
-must be <= the session's access_level on the ACCESS_RANK scale
-(public=0, internal=1, restricted=2). It must also fail closed when a
+must be <= the session's access_level on the shared ACCESS_LEVEL_RANK
+scale (public < internal < restricted). It must also fail closed when a
 cited chunk can't be found in the lookup at all (e.g. a stale/forged
 chunk_id) rather than silently letting it through.
 """
 
 import pytest
 
-from agent4_verification.verifier import ACCESS_RANK, check_access_reconfirm
+from agent4_verification.verifier import check_access_reconfirm
+from shared.enums import ACCESS_LEVEL_RANK, AccessLevel
 
 
 def test_same_level_access_is_allowed(happy_path):
     lookup = {happy_path["chunk"].chunk_id: happy_path["chunk"]}
-    ok, violations = check_access_reconfirm("public", happy_path["agent3"], lookup)
+    ok, violations = check_access_reconfirm(
+        AccessLevel.PUBLIC, happy_path["agent3"], lookup
+    )
     assert ok is True
     assert violations == []
 
@@ -23,9 +26,9 @@ def test_same_level_access_is_allowed(happy_path):
 @pytest.mark.parametrize(
     "session_level,doc_level",
     [
-        ("internal", "public"),
-        ("restricted", "public"),
-        ("restricted", "internal"),
+        (AccessLevel.INTERNAL, AccessLevel.PUBLIC),
+        (AccessLevel.RESTRICTED, AccessLevel.PUBLIC),
+        (AccessLevel.RESTRICTED, AccessLevel.INTERNAL),
     ],
 )
 def test_higher_session_level_can_see_lower_tier_docs(
@@ -45,9 +48,9 @@ def test_higher_session_level_can_see_lower_tier_docs(
 @pytest.mark.parametrize(
     "session_level,doc_level",
     [
-        ("public", "internal"),
-        ("public", "restricted"),
-        ("internal", "restricted"),
+        (AccessLevel.PUBLIC, AccessLevel.INTERNAL),
+        (AccessLevel.PUBLIC, AccessLevel.RESTRICTED),
+        (AccessLevel.INTERNAL, AccessLevel.RESTRICTED),
     ],
 )
 def test_lower_session_level_is_blocked_from_higher_tier_docs(
@@ -69,7 +72,7 @@ def test_citation_pointing_to_missing_chunk_fails_closed(happy_path):
     stale) must count as a violation, not be silently ignored."""
     empty_lookup = {}
     ok, violations = check_access_reconfirm(
-        "restricted", happy_path["agent3"], empty_lookup
+        AccessLevel.RESTRICTED, happy_path["agent3"], empty_lookup
     )
     assert ok is False
     assert violations == [happy_path["citation"].doc_id]
@@ -78,9 +81,11 @@ def test_citation_pointing_to_missing_chunk_fails_closed(happy_path):
 def test_multiple_citations_can_each_violate_independently(
     make_chunk, make_citation, make_agent3_output
 ):
-    public_chunk = make_chunk(doc_id="doc_pub", chunk_id="c_pub", doc_access_level="public")
+    public_chunk = make_chunk(
+        doc_id="doc_pub", chunk_id="c_pub", doc_access_level=AccessLevel.PUBLIC
+    )
     restricted_chunk = make_chunk(
-        doc_id="doc_restricted", chunk_id="c_restricted", doc_access_level="restricted"
+        doc_id="doc_restricted", chunk_id="c_restricted", doc_access_level=AccessLevel.RESTRICTED
     )
     cit_pub = make_citation(doc_id="doc_pub", chunk_id="c_pub")
     cit_restricted = make_citation(doc_id="doc_restricted", chunk_id="c_restricted")
@@ -91,13 +96,15 @@ def test_multiple_citations_can_each_violate_independently(
     )
     lookup = {"c_pub": public_chunk, "c_restricted": restricted_chunk}
 
-    ok, violations = check_access_reconfirm("public", agent3, lookup)
+    ok, violations = check_access_reconfirm(AccessLevel.PUBLIC, agent3, lookup)
 
     assert ok is False
     assert violations == ["doc_restricted"]
 
 
-def test_unknown_access_level_defaults_to_rank_zero():
-    """Session access levels outside the known set default to rank 0
-    (least privileged) via ACCESS_RANK.get(..., 0), rather than raising."""
-    assert ACCESS_RANK.get("nonexistent_level", 0) == 0
+def test_access_level_rank_ordering_is_public_lt_internal_lt_restricted():
+    assert (
+        ACCESS_LEVEL_RANK[AccessLevel.PUBLIC]
+        < ACCESS_LEVEL_RANK[AccessLevel.INTERNAL]
+        < ACCESS_LEVEL_RANK[AccessLevel.RESTRICTED]
+    )

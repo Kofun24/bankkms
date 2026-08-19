@@ -3,17 +3,26 @@ agent4_verification/verifier.py
 
 Agent 4 — Verification & Governance
 
+Consumes the real Agent1Output / Agent2Output / Agent3Output produced by
+Agents 1-3 (shared.schemas) and returns the shared Agent4Output. This
+module owns no data shapes of its own — it only adds decision logic on
+top of the shared contracts, so it never needs Agent 1-3 to change.
+
 Reads config from .env:
     LLM_PROVIDER=gemini
     LLM_MODEL=gemini-2.0-flash
     CONFIDENCE_THRESHOLD=0.6
-    VECTOR_DB_PATH=./knowledge_base/vector_index
-    GEMINI_API_KEY=...            <- add this too, required to call Gemini
+    GEMINI_API_KEY=...          <- required to call Gemini for real;
+                                    falls back to an offline heuristic
+                                    (see llm_factual_support_check) if unset.
 
 Pipeline:
     1. evidence_sufficiency   — did Agent 3 have grounded, cited content?
-    2. access_reconfirm       — does every cited doc respect this session's access_level?
-    3. factual_support_check  — LLM call (Gemini) checking answer_text is backed by chunks
+    2. access_reconfirm       — does every cited doc respect the session's
+                                 fixed access_level (Agent1Output.access_level,
+                                 never re-derived from user text)?
+    3. factual_support_check  — LLM call (Gemini) checking answer_text is
+                                 backed by the cited chunks
     4. version_conflict_check — same doc_title cited at different versions?
 
 Decision priority:
@@ -21,6 +30,7 @@ Decision priority:
     insufficient evidence      -> denied
     factual check fail         -> escalated
     version conflict           -> escalated
+    low retrieval confidence   -> escalated
     confidence < threshold     -> escalated
     otherwise                  -> approved
 """
@@ -29,105 +39,34 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Optional
 
 from dotenv import load_dotenv
+
+from shared.enums import (
+    ACCESS_LEVEL_RANK,
+    AccessLevel,
+    EvidenceSufficiency,
+    FactualSupportCheck,
+    RetrievalConfidence,
+    VerificationDecision,
+)
+from shared.schemas import (
+    Agent1Output,
+    Agent2Output,
+    Agent3Output,
+    Agent4Output,
+    Citation,
+    FinalCitation,
+    RetrievedChunk,
+)
 
 load_dotenv()
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.0-flash")
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.6"))
-VECTOR_DB_PATH = os.getenv("VECTOR_DB_PATH", "./knowledge_base/vector_index")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-
-# Access level ordering used for the reconfirmation check.
-ACCESS_RANK = {"public": 0, "internal": 1, "restricted": 2}
-
-
-# --------------------------------------------------------------------------
-# Data shapes (dataclasses, no pydantic dependency needed for this module)
-# --------------------------------------------------------------------------
-
-@dataclass
-class RetrievedChunk:
-    doc_id: str
-    doc_title: str
-    chunk_id: str
-    chunk_text: str
-    similarity_score: float
-    doc_access_level: str          # "public" | "internal" | "restricted"
-    doc_version: str
-    effective_date: str
-    source_section: str
-
-
-@dataclass
-class Citation:
-    doc_id: str
-    doc_title: str
-    section: str
-    chunk_id: str
-
-
-@dataclass
-class Agent2Output:
-    session_id: str
-    access_level: str
-    results: list[RetrievedChunk] = field(default_factory=list)
-    retrieval_confidence: str = "medium"   # "high" | "medium" | "low"
-
-
-@dataclass
-class Agent3Output:
-    session_id: str
-    answer_text: str
-    grounded: bool
-    citations: list[Citation] = field(default_factory=list)
-    chunks_used: list[str] = field(default_factory=list)
-
-
-@dataclass
-class Agent4Input:
-    session_id: str
-    user_role: str
-    access_level: str              # "public" | "internal" | "restricted"
-    agent2_output: Agent2Output
-    agent3_output: Agent3Output
-
-
-@dataclass
-class Agent4Output:
-    session_id: str
-    decision: str                  # "approved" | "denied" | "escalated"
-    denial_reason: Optional[str]
-    evidence_sufficiency: str      # "sufficient" | "insufficient"
-    factual_support_check: str     # "pass" | "fail"
-    version_conflict_detected: bool
-    conflict_details: Optional[str]
-    access_reconfirmed: bool
-    final_answer: Optional[str]
-    final_citations: list[dict]
-    confidence: float
-    timestamp: str
-
-    def to_dict(self) -> dict:
-        return {
-            "session_id": self.session_id,
-            "decision": self.decision,
-            "denial_reason": self.denial_reason,
-            "evidence_sufficiency": self.evidence_sufficiency,
-            "factual_support_check": self.factual_support_check,
-            "version_conflict_detected": self.version_conflict_detected,
-            "conflict_details": self.conflict_details,
-            "access_reconfirmed": self.access_reconfirmed,
-            "final_answer": self.final_answer,
-            "final_citations": self.final_citations,
-            "confidence": self.confidence,
-            "timestamp": self.timestamp,
-        }
 
 
 # --------------------------------------------------------------------------
@@ -164,21 +103,25 @@ def _get_gemini_client():
 
 def llm_factual_support_check(
     answer_text: str, chunk_texts: list[str]
-) -> tuple[str, float]:
+) -> tuple[FactualSupportCheck, float]:
     """
     Asks Gemini whether answer_text is fully supported by chunk_texts.
-    Returns (verdict, confidence) where verdict is "pass" | "fail".
+    Returns (verdict, confidence).
 
     Falls back to a simple heuristic (empty check) if Gemini is unavailable
     (no API key set, package not installed, or the call fails) so Agent 4
-    still runs end-to-end without a live LLM connection.
+    still runs end-to-end without a live LLM connection. Note: the fallback
+    caps confidence at 0.5, which sits below the default CONFIDENCE_THRESHOLD
+    (0.6) — so without a configured GEMINI_API_KEY, Agent 4 will escalate
+    rather than approve, by design (fail safe, not silently approve
+    unverified content).
     """
     client = _get_gemini_client()
 
     if client is None or not chunk_texts:
-        # Fallback heuristic: can't verify without an LLM or without any
-        # chunks to check against -> fail closed, don't approve blindly.
-        return ("fail", 0.0) if not chunk_texts else ("pass", 0.5)
+        if not chunk_texts:
+            return FactualSupportCheck.FAIL, 0.0
+        return FactualSupportCheck.PASS, 0.5
 
     context = "\n\n".join(f"[Chunk {i+1}] {t}" for i, t in enumerate(chunk_texts))
     prompt = f"""You are a strict fact-checking module for a banking knowledge system.
@@ -202,33 +145,38 @@ Respond ONLY with JSON, no markdown fences, no preamble:
         raw = response.text.strip()
         raw = raw.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(raw)
-        verdict = parsed.get("verdict", "fail")
+        verdict_str = parsed.get("verdict", "fail")
         confidence = float(parsed.get("confidence", 0.0))
-        if verdict not in ("pass", "fail"):
-            verdict = "fail"
+        verdict = (
+            FactualSupportCheck.PASS if verdict_str == "pass" else FactualSupportCheck.FAIL
+        )
         return verdict, confidence
     except Exception:
         # LLM call failed or returned unparseable output — fail closed
         # rather than silently approving unverified content.
-        return "fail", 0.0
+        return FactualSupportCheck.FAIL, 0.0
 
 
 # --------------------------------------------------------------------------
 # Checks
 # --------------------------------------------------------------------------
 
-def check_evidence_sufficiency(agent3: Agent3Output) -> str:
+def check_evidence_sufficiency(agent3: Agent3Output) -> EvidenceSufficiency:
     if agent3.grounded and agent3.citations and agent3.chunks_used:
-        return "sufficient"
-    return "insufficient"
+        return EvidenceSufficiency.SUFFICIENT
+    return EvidenceSufficiency.INSUFFICIENT
 
 
 def check_access_reconfirm(
-    session_access_level: str,
+    session_access_level: AccessLevel,
     agent3: Agent3Output,
     chunk_lookup: dict[str, RetrievedChunk],
 ) -> tuple[bool, list[str]]:
-    session_rank = ACCESS_RANK.get(session_access_level, 0)
+    """Re-checks every citation against the session's fixed access_level
+    (from Agent 1, never re-derived from user text). A citation whose
+    chunk_id can't be resolved in chunk_lookup fails closed — it's
+    treated as a violation, not silently ignored."""
+    session_rank = ACCESS_LEVEL_RANK.get(session_access_level, 0)
     violating_docs: list[str] = []
 
     for citation in agent3.citations:
@@ -236,7 +184,7 @@ def check_access_reconfirm(
         if chunk is None:
             violating_docs.append(citation.doc_id)
             continue
-        if ACCESS_RANK.get(chunk.doc_access_level, 99) > session_rank:
+        if ACCESS_LEVEL_RANK.get(chunk.doc_access_level, 99) > session_rank:
             violating_docs.append(citation.doc_id)
 
     return (len(violating_docs) == 0, violating_docs)
@@ -244,14 +192,14 @@ def check_access_reconfirm(
 
 def check_factual_support(
     agent3: Agent3Output, chunk_lookup: dict[str, RetrievedChunk]
-) -> tuple[str, float]:
+) -> tuple[FactualSupportCheck, float]:
     if not agent3.citations:
-        return "fail", 0.0
+        return FactualSupportCheck.FAIL, 0.0
 
     cited_ids = {c.chunk_id for c in agent3.citations}
     used_ids = set(agent3.chunks_used)
     if not used_ids.issubset(cited_ids):
-        return "fail", 0.0  # used but uncited content -> fail fast, skip LLM call
+        return FactualSupportCheck.FAIL, 0.0  # used but uncited content -> fail fast
 
     chunk_texts = [
         chunk_lookup[cid].chunk_text for cid in cited_ids if cid in chunk_lookup
@@ -284,83 +232,100 @@ def check_version_conflict(
 
 
 def decide(
-    evidence: str,
+    evidence: EvidenceSufficiency,
     access_ok: bool,
-    factual: str,
+    factual: FactualSupportCheck,
     factual_confidence: float,
     version_conflict: bool,
     retrieval_confidence_low: bool,
-) -> tuple[str, Optional[str]]:
+) -> tuple[VerificationDecision, Optional[str]]:
     if not access_ok:
-        return "denied", "access_violation: cited document(s) exceed session access_level"
+        return (
+            VerificationDecision.DENIED,
+            "access_violation: cited document(s) exceed session access_level",
+        )
 
-    if evidence == "insufficient":
-        return "denied", "insufficient_evidence: no grounded, cited content available"
+    if evidence == EvidenceSufficiency.INSUFFICIENT:
+        return (
+            VerificationDecision.DENIED,
+            "insufficient_evidence: no grounded, cited content available",
+        )
 
-    if factual == "fail":
-        return "escalated", None
+    if factual == FactualSupportCheck.FAIL:
+        return VerificationDecision.ESCALATED, None
 
     if version_conflict:
-        return "escalated", None
+        return VerificationDecision.ESCALATED, None
 
     if retrieval_confidence_low:
-        return "escalated", None
+        return VerificationDecision.ESCALATED, None
 
     if factual_confidence < CONFIDENCE_THRESHOLD:
-        return "escalated", None
+        return VerificationDecision.ESCALATED, None
 
-    return "approved", None
+    return VerificationDecision.APPROVED, None
 
 
 # --------------------------------------------------------------------------
 # Main entry point
 # --------------------------------------------------------------------------
 
-def run_agent4(payload: Agent4Input) -> Agent4Output:
-    chunk_lookup = {c.chunk_id: c for c in payload.agent2_output.results}
+def run_agent4(
+    agent1_output: Agent1Output,
+    agent2_output: Agent2Output,
+    agent3_output: Agent3Output,
+) -> Agent4Output:
+    """Runs Agent 4 against the real outputs of Agents 1-3.
 
-    evidence = check_evidence_sufficiency(payload.agent3_output)
+    agent1_output.access_level is used as the authoritative session access
+    level for the RBAC re-check (it's fixed system state set by Agent 1's
+    ROLE_ACCESS_MAP, never derived from raw user text) — not
+    agent2_output.access_level, which is just what was passed down for
+    filtering and could theoretically drift from the session's true role.
+    """
+    chunk_lookup = {c.chunk_id: c for c in agent2_output.results}
+
+    evidence = check_evidence_sufficiency(agent3_output)
     access_ok, violating_docs = check_access_reconfirm(
-        payload.access_level, payload.agent3_output, chunk_lookup
+        agent1_output.access_level, agent3_output, chunk_lookup
     )
-    factual, factual_confidence = check_factual_support(
-        payload.agent3_output, chunk_lookup
-    )
+    factual, factual_confidence = check_factual_support(agent3_output, chunk_lookup)
     conflict_detected, conflict_details = check_version_conflict(
-        payload.agent3_output, chunk_lookup
+        agent3_output, chunk_lookup
     )
-    retrieval_confidence_low = payload.agent2_output.retrieval_confidence == "low"
+    retrieval_confidence_low = (
+        agent2_output.retrieval_confidence == RetrievalConfidence.LOW
+    )
 
     decision, denial_reason = decide(
         evidence, access_ok, factual, factual_confidence,
         conflict_detected, retrieval_confidence_low,
     )
 
-    if decision == "denied" and not access_ok:
-        denial_reason += f" (doc_ids: {', '.join(violating_docs)})"
+    if decision == VerificationDecision.DENIED and not access_ok:
+        denial_reason = f"{denial_reason} (doc_ids: {', '.join(violating_docs)})"
 
-    approved = decision == "approved"
+    approved = decision == VerificationDecision.APPROVED
 
     return Agent4Output(
-        session_id=payload.session_id,
+        session_id=agent3_output.session_id,
         decision=decision,
-        denial_reason=denial_reason if decision == "denied" else None,
+        denial_reason=denial_reason if decision == VerificationDecision.DENIED else None,
         evidence_sufficiency=evidence,
         factual_support_check=factual,
         version_conflict_detected=conflict_detected,
         conflict_details=conflict_details,
         access_reconfirmed=access_ok,
-        final_answer=payload.agent3_output.answer_text if approved else None,
+        final_answer=agent3_output.answer_text if approved else None,
         final_citations=(
             [
-                {"doc_id": c.doc_id, "doc_title": c.doc_title, "section": c.section}
-                for c in payload.agent3_output.citations
+                FinalCitation(doc_id=c.doc_id, doc_title=c.doc_title, section=c.section)
+                for c in agent3_output.citations
             ]
             if approved
             else []
         ),
         confidence=round(factual_confidence, 2),
-        timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
 
@@ -369,24 +334,37 @@ def run_agent4(payload: Agent4Input) -> Agent4Output:
 # --------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    from shared.enums import Intent, UserRole
+
+    demo_agent1 = Agent1Output(
+        session_id="sess_demo",
+        user_role=UserRole.CUSTOMER,
+        access_level=AccessLevel.PUBLIC,
+        intent=Intent.ACCOUNT_INFO,
+        topic="savings_account",
+        normalized_query="What is the minimum balance for a savings account?",
+        confidence=0.9,
+    )
+
+    demo_chunk = RetrievedChunk(
+        doc_id="doc_001",
+        doc_title="Savings Account Guide",
+        chunk_id="doc_001_c03",
+        chunk_text="The minimum balance for a standard savings account is LKR 1,000.",
+        similarity_score=0.91,
+        doc_access_level=AccessLevel.PUBLIC,
+        doc_version="v1",
+        effective_date="2024-06-01",
+        source_section="Section 2.1",
+    )
     demo_agent2 = Agent2Output(
         session_id="sess_demo",
-        access_level="public",
-        results=[
-            RetrievedChunk(
-                doc_id="doc_001",
-                doc_title="Savings Account Guide",
-                chunk_id="doc_001_c03",
-                chunk_text="The minimum balance for a standard savings account is LKR 1,000.",
-                similarity_score=0.91,
-                doc_access_level="public",
-                doc_version="v1",
-                effective_date="2024-06-01",
-                source_section="Section 2.1",
-            ),
-        ],
-        retrieval_confidence="high",
+        query_used="minimum balance savings account",
+        access_level=AccessLevel.PUBLIC,
+        results=[demo_chunk],
+        retrieval_confidence=RetrievalConfidence.HIGH,
     )
+
     demo_agent3 = Agent3Output(
         session_id="sess_demo",
         answer_text="The minimum balance for a standard savings account is LKR 1,000.",
@@ -397,13 +375,6 @@ if __name__ == "__main__":
         ],
         chunks_used=["doc_001_c03"],
     )
-    demo_payload = Agent4Input(
-        session_id="sess_demo",
-        user_role="customer",
-        access_level="public",
-        agent2_output=demo_agent2,
-        agent3_output=demo_agent3,
-    )
 
-    result = run_agent4(demo_payload)
-    print(json.dumps(result.to_dict(), indent=2))
+    result = run_agent4(demo_agent1, demo_agent2, demo_agent3)
+    print(result.model_dump_json(indent=2))

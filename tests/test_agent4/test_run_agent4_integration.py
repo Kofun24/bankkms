@@ -1,9 +1,9 @@
 """
 Agent 4 — end-to-end `run_agent4()` integration tests.
 
-These build full Agent4Input payloads (as Agent 2 + Agent 3 would
-actually hand off) and check the final Agent4Output, including the
-fields downstream systems / the audit log (Agent 5) would rely on.
+These build full Agent1Output / Agent2Output / Agent3Output payloads (as
+Agents 1-3 actually hand off) and check the final Agent4Output, including
+the fields downstream systems / the audit log (Agent 5) would rely on.
 
 Important: with no Gemini client configured, the offline fallback
 heuristic caps factual confidence at 0.5, which is below the default
@@ -13,48 +13,48 @@ verdict with confidence >= threshold. Tests that don't care about
 factual confidence use the fallback as-is.
 """
 
+import json
+
 from agent4_verification.verifier import run_agent4
+from shared.enums import AccessLevel, RetrievalConfidence, VerificationDecision
 
 
 def test_approved_requires_a_confident_llm_pass(happy_path, fake_gemini):
     fake_gemini('{"verdict": "pass", "confidence": 0.92, "reason": "fully grounded"}')
 
-    result = run_agent4(happy_path["payload"])
+    result = run_agent4(happy_path["agent1"], happy_path["agent2"], happy_path["agent3"])
 
-    assert result.decision == "approved"
+    assert result.decision == VerificationDecision.APPROVED
     assert result.denial_reason is None
-    assert result.evidence_sufficiency == "sufficient"
-    assert result.factual_support_check == "pass"
+    assert result.evidence_sufficiency.value == "sufficient"
+    assert result.factual_support_check.value == "pass"
     assert result.version_conflict_detected is False
     assert result.access_reconfirmed is True
     assert result.final_answer == happy_path["agent3"].answer_text
-    assert result.final_citations == [
-        {
-            "doc_id": happy_path["citation"].doc_id,
-            "doc_title": happy_path["citation"].doc_title,
-            "section": happy_path["citation"].section,
-        }
-    ]
+    assert len(result.final_citations) == 1
+    assert result.final_citations[0].doc_id == happy_path["citation"].doc_id
+    assert result.final_citations[0].doc_title == happy_path["citation"].doc_title
+    assert result.final_citations[0].section == happy_path["citation"].section
     assert result.confidence == 0.92
-    assert result.session_id == happy_path["payload"].session_id
+    assert result.session_id == happy_path["agent3"].session_id
 
 
 def test_offline_fallback_alone_is_never_enough_to_approve(happy_path):
     """No Gemini configured -> fallback confidence 0.5 < default
     threshold 0.6 -> the system must escalate for human review rather
     than silently approving an answer nobody actually fact-checked."""
-    result = run_agent4(happy_path["payload"])
+    result = run_agent4(happy_path["agent1"], happy_path["agent2"], happy_path["agent3"])
 
-    assert result.decision == "escalated"
-    assert result.factual_support_check == "pass"  # heuristic still "passes" it
+    assert result.decision == VerificationDecision.ESCALATED
+    assert result.factual_support_check.value == "pass"  # heuristic still "passes" it
     assert result.confidence == 0.5
     assert result.final_answer is None
     assert result.final_citations == []
 
 
 def test_denied_on_access_violation_never_leaks_the_answer(
-    make_chunk, make_citation, make_agent2_output, make_agent3_output,
-    make_agent4_input, fake_gemini,
+    make_chunk, make_citation, make_agent1_output, make_agent2_output,
+    make_agent3_output, fake_gemini,
 ):
     """Even if the LLM would happily confirm the answer is factually
     supported, a restricted-tier chunk cited into a public session must
@@ -63,24 +63,24 @@ def test_denied_on_access_violation_never_leaks_the_answer(
 
     restricted_chunk = make_chunk(
         doc_id="doc_009", chunk_id="doc_009_c01",
-        doc_title="AML Procedure", doc_access_level="restricted",
+        doc_title="AML Procedure", doc_access_level=AccessLevel.RESTRICTED,
         chunk_text="Suspicious transaction threshold is $10,000.",
     )
     citation = make_citation(
         doc_id="doc_009", doc_title="AML Procedure",
         section="Section 1.0", chunk_id="doc_009_c01",
     )
-    agent2 = make_agent2_output(results=[restricted_chunk])
+    agent1 = make_agent1_output(access_level=AccessLevel.PUBLIC)
+    agent2 = make_agent2_output(access_level=AccessLevel.PUBLIC, results=[restricted_chunk])
     agent3 = make_agent3_output(
         answer_text="Suspicious transaction threshold is $10,000.",
         citations=[citation],
         chunks_used=["doc_009_c01"],
     )
-    payload = make_agent4_input(access_level="public", agent2_output=agent2, agent3_output=agent3)
 
-    result = run_agent4(payload)
+    result = run_agent4(agent1, agent2, agent3)
 
-    assert result.decision == "denied"
+    assert result.decision == VerificationDecision.DENIED
     assert "access_violation" in result.denial_reason
     assert "doc_009" in result.denial_reason
     assert result.final_answer is None
@@ -88,24 +88,24 @@ def test_denied_on_access_violation_never_leaks_the_answer(
 
 
 def test_denied_on_insufficient_evidence(
-    make_agent2_output, make_agent3_output, make_agent4_input
+    make_agent1_output, make_agent2_output, make_agent3_output
 ):
     """Agent 3 produced an ungrounded answer (e.g. it fell back to
     general knowledge) -- Agent 4 must deny outright, not escalate."""
+    agent1 = make_agent1_output()
     agent2 = make_agent2_output(results=[])
     agent3 = make_agent3_output(grounded=False, citations=[], chunks_used=[])
-    payload = make_agent4_input(agent2_output=agent2, agent3_output=agent3)
 
-    result = run_agent4(payload)
+    result = run_agent4(agent1, agent2, agent3)
 
-    assert result.decision == "denied"
+    assert result.decision == VerificationDecision.DENIED
     assert "insufficient_evidence" in result.denial_reason
     assert result.final_answer is None
 
 
 def test_escalated_on_version_conflict_even_with_confident_llm(
-    make_chunk, make_citation, make_agent2_output, make_agent3_output,
-    make_agent4_input, fake_gemini,
+    make_chunk, make_citation, make_agent1_output, make_agent2_output,
+    make_agent3_output, fake_gemini,
 ):
     fake_gemini('{"verdict": "pass", "confidence": 0.97, "reason": "supported"}')
 
@@ -122,54 +122,55 @@ def test_escalated_on_version_conflict_even_with_confident_llm(
     cit_v1 = make_citation(doc_id="doc_010", doc_title="Minimum Balance Policy", chunk_id="c1")
     cit_v2 = make_citation(doc_id="doc_010b", doc_title="Minimum Balance Policy", chunk_id="c2")
 
+    agent1 = make_agent1_output()
     agent2 = make_agent2_output(results=[chunk_v1, chunk_v2])
     agent3 = make_agent3_output(
         answer_text="The minimum balance has been LKR 1,000, now updated to LKR 2,500.",
         citations=[cit_v1, cit_v2],
         chunks_used=["c1", "c2"],
     )
-    payload = make_agent4_input(agent2_output=agent2, agent3_output=agent3)
 
-    result = run_agent4(payload)
+    result = run_agent4(agent1, agent2, agent3)
 
-    assert result.decision == "escalated"
+    assert result.decision == VerificationDecision.ESCALATED
     assert result.version_conflict_detected is True
     assert "Minimum Balance Policy" in result.conflict_details
     assert result.final_answer is None
 
 
-def test_escalated_on_low_retrieval_confidence(happy_path, fake_gemini):
+def test_escalated_on_low_retrieval_confidence(happy_path, fake_gemini, make_agent2_output):
     fake_gemini('{"verdict": "pass", "confidence": 0.9, "reason": "supported"}')
-    happy_path["agent2"].retrieval_confidence = "low"
+    low_confidence_agent2 = make_agent2_output(
+        results=happy_path["agent2"].results,
+        retrieval_confidence=RetrievalConfidence.LOW,
+    )
 
-    result = run_agent4(happy_path["payload"])
+    result = run_agent4(happy_path["agent1"], low_confidence_agent2, happy_path["agent3"])
 
-    assert result.decision == "escalated"
+    assert result.decision == VerificationDecision.ESCALATED
     assert result.final_answer is None
 
 
 def test_escalated_on_factual_check_failure(happy_path, fake_gemini):
     fake_gemini('{"verdict": "fail", "confidence": 0.1, "reason": "unsupported number"}')
 
-    result = run_agent4(happy_path["payload"])
+    result = run_agent4(happy_path["agent1"], happy_path["agent2"], happy_path["agent3"])
 
-    assert result.decision == "escalated"
-    assert result.factual_support_check == "fail"
+    assert result.decision == VerificationDecision.ESCALATED
+    assert result.factual_support_check.value == "fail"
     assert result.final_answer is None
 
 
-def test_output_is_json_serializable_via_to_dict(happy_path, fake_gemini):
+def test_output_is_json_serializable(happy_path, fake_gemini):
     """Sanity check for whatever consumes Agent 4's output downstream
-    (API response, Agent 5 audit log, etc.) -- to_dict() must round-trip
-    through json.dumps without error."""
-    import json
-
+    (API response, Agent 5 audit log, etc.) -- Pydantic's
+    model_dump_json() must round-trip through json.loads without error."""
     fake_gemini('{"verdict": "pass", "confidence": 0.9, "reason": "ok"}')
-    result = run_agent4(happy_path["payload"])
+    result = run_agent4(happy_path["agent1"], happy_path["agent2"], happy_path["agent3"])
 
-    serialized = json.dumps(result.to_dict())
+    serialized = result.model_dump_json()
     assert isinstance(serialized, str)
 
     reloaded = json.loads(serialized)
     assert reloaded["decision"] == "approved"
-    assert reloaded["session_id"] == happy_path["payload"].session_id
+    assert reloaded["session_id"] == happy_path["agent3"].session_id
