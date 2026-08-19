@@ -130,7 +130,7 @@ def classify_query(
     Raises:
         UnknownSessionError, UnauthorizedRoleError — propagated from auth.py.
     """
-    ctx = resolve_access(session_id)  # role + access_level, fixed system state
+    ctx = resolve_access(session_id, allow_anonymous=True)  # customers: auto-provision if unregistered
 
     sanitized: SanitizationResult = sanitize_query(raw_query)
 
