@@ -19,13 +19,29 @@ from agent1_classification.gemini_classifier import gemini_classify
 from agent2_retrieval.retriever import Agent2Retriever
 from agent3_response.responder import analyze_and_respond
 from agent4_verification.verifier import run_agent4
+from agent5_audit_logging.logger import (
+    log_classification,
+    log_generation,
+    log_retrieval,
+    log_verification,
+)
 from shared.enums import UserRole, VerificationDecision
 from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output
+
 
 # Instantiated once at import time — loading the embedder + vector store on
 # every query would be wasteful. Requires `python -m agent2_retrieval.ingest`
 # to have been run at least once so the index exists on disk.
 _agent2 = Agent2Retriever()
+
+def _safe_log(log_fn, output) -> None:
+    """Runs one Agent 5 logging call without letting a logging failure
+    take down the pipeline. Audit logging should never be able to deny
+    a user a response that already passed verification."""
+    try:
+        log_fn(output)
+    except Exception as exc:
+        print(f"[agent5_audit_logging] WARNING: failed to log stage: {exc}")
 
 def _user_facing_message(agent4_output: Agent4Output, agent3_output: Agent3Output) -> str:
     """Builds what the end user actually sees, based on Agent 4's decision.
@@ -76,6 +92,8 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
             "error": "unauthorized_role",
             "message": "Unable to resolve access for this session.",
         }
+    
+    _safe_log(log_classification, agent1_output)
 
     if agent1_output.needs_clarification:
         return {
@@ -85,10 +103,13 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
         }
 
     agent2_output: Agent2Output = _agent2.run(agent1_output)
+    _safe_log(log_retrieval, agent2_output)
 
     agent3_output: Agent3Output = analyze_and_respond(agent2_output)
+    _safe_log(log_generation, agent3_output)
     
     agent4_output: Agent4Output = run_agent4(agent1_output, agent2_output, agent3_output)
+    _safe_log(log_verification, agent4_output)
 
     # TODO (Agent 4 owner): call verification here
     # agent4_output = verify_response(agent3_output, agent1_output)
@@ -104,7 +125,21 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
 
 
 if __name__ == "__main__":
+    from agent5_audit_logging.logger import read_all_records, verify_chain
     import json
+    
+      # used to frame each section of the output.
+    def _divider(char="=", width=64):#
+        print(char * width)
+
+    def _section(title):
+        print()
+        _divider()
+        print(f" {title}")
+        _divider()
+
+    def _kv(label, value, width=22):
+        print(f"  {label:<{width}} {value}")
 
     # Manual smoke test — run: python pipeline.py
     register_session("demo_session", UserRole.CUSTOMER)
@@ -170,4 +205,34 @@ if __name__ == "__main__":
         print("Final Citations:")
         for c in a4.final_citations:
             print(f"  - [{c.doc_id}] {c.doc_title} / {c.section}")
+            
+     #agent 5 audit trail 
+    # AGENT 5 — shows this run's 4 audit records as a simple table
+    # (stage / agent / summary), then reports whether the full
+    # hash-chained log is still intact or has been tampered with.      
+    _section("AGENT 5 - AUDIT TRAIL")
+    session_records = [r for r in read_all_records() if r.session_id == "demo_session"]
+    this_run = session_records[-4:]  # just this run's 4 stages
+
+    print(f"  {'STAGE':<15}{'AGENT':<24}SUMMARY")
+    print(f"  {'-' * 13:<15}{'-' * 22:<24}{'-' * 30}")
+    for r in this_run:
+        summary = r.decision_summary
+        if len(summary) > 45:
+            summary = summary[:42] + "..."
+        print(f"  {r.stage.value:<15}{r.agent:<24}{summary}")
+
+    chain_ok, broken = verify_chain()
+    status_label = "INTACT" if chain_ok else "TAMPERED"
+    print()
+    _kv("Total Records Logged:", len(session_records))
+    _kv("Full Chain Status:", status_label)
+    if not chain_ok:
+        print("\n  WARNING: tampering detected in the following record(s):")
+        for b in broken:
+            print(f"    - index {b['index']} ({b['stage']}) log_id={b['log_id']}")
+
+    print()
+    _divider()
+    print()
     print("------------------------\n")
