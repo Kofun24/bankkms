@@ -8,6 +8,8 @@ Run with: pytest tests/test_agent1/test_classifier.py -v
 """
 
 import pytest
+import tempfile
+import os
 
 from agent1_classification.auth import register_session, SessionStore
 import agent1_classification.auth as auth_module
@@ -15,6 +17,15 @@ from agent1_classification.classifier import classify_query, CONFIDENCE_THRESHOL
 from agent1_classification.auth import UnknownSessionError
 from shared.enums import AccessLevel, Intent, UserRole
 
+
+@pytest.fixture(autouse=True)
+def isolated_audit_log(monkeypatch, tmp_path):
+    """Redirect Agent 5 logging to a temp file during tests, so test runs
+    don't pollute the real audit log or depend on it existing."""
+    fake_log_path = str(tmp_path / "test_audit_log.jsonl")
+    monkeypatch.setattr(
+        "agent5_audit_logging.logger.AUDIT_LOG_PATH", fake_log_path
+    )
 
 # ---------- Fixture: clean session store per test ----------
 

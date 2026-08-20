@@ -20,6 +20,7 @@ from typing import Callable, Optional
 
 from dotenv import load_dotenv
 
+
 from agent1_classification.auth import resolve_access
 from agent1_classification.sanitizer import sanitize_query, SanitizationResult
 from shared.enums import Intent
@@ -130,7 +131,7 @@ def classify_query(
     Raises:
         UnknownSessionError, UnauthorizedRoleError — propagated from auth.py.
     """
-    ctx = resolve_access(session_id, allow_anonymous=True)  # customers: auto-provision if unregistered
+    ctx = resolve_access(session_id, allow_anonymous=True)
 
     sanitized: SanitizationResult = sanitize_query(raw_query)
 
@@ -149,7 +150,7 @@ def classify_query(
         possible_injection_attempt=sanitized.possible_injection_attempt,
     )
 
-    return Agent1Output(
+    result = Agent1Output(
         session_id=session_id,
         user_role=ctx.user_role,
         access_level=ctx.access_level,
@@ -161,3 +162,5 @@ def classify_query(
         clarifying_question=clarifying_question,
         flags=flags,
     )
+
+    return result
