@@ -5,12 +5,14 @@ class UserRole(str, Enum):
     CUSTOMER = "customer"
     EMPLOYEE = "employee"
     COMPLIANCE = "compliance"
+    ADMIN = "admin"
 
 
 class AccessLevel(str, Enum):
     PUBLIC = "public"
     INTERNAL = "internal"
     RESTRICTED = "restricted"
+    NONE = "none"
 
 
 class Intent(str, Enum):
@@ -70,4 +72,5 @@ ROLE_ACCESS_MAP = {
     UserRole.CUSTOMER: AccessLevel.PUBLIC,
     UserRole.EMPLOYEE: AccessLevel.INTERNAL,
     UserRole.COMPLIANCE: AccessLevel.RESTRICTED,
+    UserRole.ADMIN: AccessLevel.NONE,
 }

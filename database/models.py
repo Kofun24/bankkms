@@ -42,18 +42,21 @@ def utcnow():
 class UserRole(str, enum.Enum):
     EMPLOYEE = "employee"
     COMPLIANCE = "compliance"
+    ADMIN = "admin"
 
 
 class SessionRole(str, enum.Enum):
     CUSTOMER = "customer"
     EMPLOYEE = "employee"
     COMPLIANCE = "compliance"
+    ADMIN = "admin"
 
 
 class AccessLevel(str, enum.Enum):
     PUBLIC = "public"
     INTERNAL = "internal"
     RESTRICTED = "restricted"
+    NONE = "none"
 
 
 class AuditStage(str, enum.Enum):
@@ -72,7 +75,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=False)
-    role = Column(Enum(UserRole), nullable=False)  # employee | compliance only
+    role = Column(Enum(UserRole, values_callable=lambda x: [e.value for e in x]), nullable=False)  # employee | compliance | admin
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
@@ -85,7 +88,7 @@ class Session(Base):
     id = Column(Integer, primary_key=True)
     session_token = Column(String, unique=True, nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # null = anonymous customer
-    role = Column(Enum(SessionRole), nullable=False)  # fixed at creation, never re-derived
+    role = Column(Enum(SessionRole, values_callable=lambda x: [e.value for e in x]), nullable=False)  # fixed at creation, never re-derived
     is_anonymous = Column(Boolean, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
@@ -100,7 +103,7 @@ class Document(Base):
     id = Column(Integer, primary_key=True)
     doc_id = Column(String, unique=True, nullable=False, index=True)  # e.g. "doc_001"
     title = Column(String, nullable=False)
-    access_level = Column(Enum(AccessLevel), nullable=False)
+    access_level = Column(Enum(AccessLevel, values_callable=lambda x: [e.value for e in x]), nullable=False)
     version = Column(String, nullable=False)
     effective_date = Column(Date, nullable=False)
     file_path = Column(Text, nullable=False)
@@ -131,7 +134,7 @@ class AuditLog(Base):
     id = Column(Integer, primary_key=True)
     log_id = Column(UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4)
     session_id = Column(String, nullable=False, index=True)  # not FK-enforced; may be anonymous
-    stage = Column(Enum(AuditStage), nullable=False)
+    stage = Column(Enum(AuditStage, values_callable=lambda x: [e.value for e in x]), nullable=False)
     agent = Column(String, nullable=False)
     payload_snapshot = Column(JSONB, nullable=False)
     decision_summary = Column(Text, nullable=False)
