@@ -5,12 +5,14 @@ class UserRole(str, Enum):
     CUSTOMER = "customer"
     EMPLOYEE = "employee"
     COMPLIANCE = "compliance"
+    ADMIN = "admin"
 
 
 class AccessLevel(str, Enum):
     PUBLIC = "public"
     INTERNAL = "internal"
     RESTRICTED = "restricted"
+    NONE = "none"
 
 
 class Intent(str, Enum):
@@ -70,18 +72,5 @@ ROLE_ACCESS_MAP = {
     UserRole.CUSTOMER: AccessLevel.PUBLIC,
     UserRole.EMPLOYEE: AccessLevel.INTERNAL,
     UserRole.COMPLIANCE: AccessLevel.RESTRICTED,
+    UserRole.ADMIN: AccessLevel.NONE,
 }
-
-# Hierarchy used by Agent 2 / Agent 4 to decide which doc access levels
-# a given session access_level is permitted to see (higher role sees lower tiers too).
-ACCESS_LEVEL_RANK = {
-    AccessLevel.PUBLIC: 1,
-    AccessLevel.INTERNAL: 2,
-    AccessLevel.RESTRICTED: 3,
-}
-
-
-def allowed_access_levels(access_level: AccessLevel) -> list[AccessLevel]:
-    """All doc access levels a session with `access_level` is permitted to retrieve."""
-    max_rank = ACCESS_LEVEL_RANK[access_level]
-    return [lvl for lvl, rank in ACCESS_LEVEL_RANK.items() if rank <= max_rank]

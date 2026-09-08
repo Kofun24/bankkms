@@ -5,6 +5,8 @@ sentence-transformers
 fastapi
 uvicorn
 pydantic
-scikit-learn
-pyyaml
-python-dotenv
+sqlalchemy
+psycopg2-binary
+pgvector
+alembicpasslib
+bcrypt==4.0.1

@@ -20,7 +20,7 @@ from typing import Callable, Optional
 
 from dotenv import load_dotenv
 
-from agent1_classification.auth import resolve_access
+from agent1_classification.auth import require_query_access
 from agent1_classification.sanitizer import sanitize_query, SanitizationResult
 from shared.enums import Intent
 from shared.schemas import Agent1Output, InputFlags
@@ -130,7 +130,7 @@ def classify_query(
     Raises:
         UnknownSessionError, UnauthorizedRoleError — propagated from auth.py.
     """
-    ctx = resolve_access(session_id)  # role + access_level, fixed system state
+    ctx = require_query_access(session_id)
 
     sanitized: SanitizationResult = sanitize_query(raw_query)
 
