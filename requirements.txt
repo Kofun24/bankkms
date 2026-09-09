@@ -10,3 +10,5 @@ pgvector
 alembic
 passlib
 bcrypt==4.0.1
+fastapi
+uvicorn
