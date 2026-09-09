@@ -65,13 +65,14 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
     # agent4_output = verify_response(agent3_output, agent1_output)
 
     return {
-        "agent1_output": agent1_output,
-        "agent2_output": agent2_output,
-        "status": "classified_awaiting_retrieval",
-        "message_to_user": (
-            "Query classified successfully. Retrieval pipeline not yet connected."
-        ),
-    }
+    "agent1_output": agent1_output,
+    "agent2_output": agent2_output,
+    "status": "retrieved_awaiting_synthesis",
+    "message_to_user": (
+        "Query classified and knowledge retrieved. "
+        "Response synthesis not yet connected."
+    ),
+}
 
 
 if __name__ == "__main__":
