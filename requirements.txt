@@ -8,5 +8,6 @@ pydantic
 sqlalchemy
 psycopg2-binary
 pgvector
-alembicpasslib
+alembic
+passlib
 bcrypt==4.0.1
