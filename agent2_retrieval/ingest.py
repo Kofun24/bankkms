@@ -68,6 +68,7 @@ def load_source_documents(kb_dir: str | None = None) -> list[dict]:
                 "version": str(frontmatter["version"]),
                 "effective_date": str(frontmatter["effective_date"]),
                 "file_path": str(md_file),
+                "is_current": bool(frontmatter.get("is_current", True)),
                 "chunks": chunks,
             }
         )
@@ -105,6 +106,7 @@ def run_ingestion(reset: bool = False, kb_dir: str | None = None) -> int:
             version=doc["version"],
             effective_date=doc["effective_date"],
             file_path=doc["file_path"],
+            is_current=doc["is_current"],
         )
 
         if not created:

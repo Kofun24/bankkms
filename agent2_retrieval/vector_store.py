@@ -67,6 +67,7 @@ class VectorStore:
         version: str,
         effective_date: str,
         file_path: str,
+        is_current: bool = True,
     ) -> tuple[int, bool]:
         """Inserts a Document row if doc_id doesn't already exist.
         Returns (internal_id, was_created) — was_created lets the caller
