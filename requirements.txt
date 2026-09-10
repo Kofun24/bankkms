@@ -1,8 +1,6 @@
 python-dotenv
 google-genai
 sentence-transformers
-fastapi
-uvicorn
 pydantic
 sqlalchemy
 psycopg2-binary
@@ -12,3 +10,7 @@ passlib
 bcrypt==4.0.1
 fastapi
 uvicorn
+pytest
+scikit-learn
+pyyaml
+
