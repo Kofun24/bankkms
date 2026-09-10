@@ -397,7 +397,18 @@ td { padding: 16px 18px; border-top: 1px solid #e5e1d9; font-size: 11px; white-s
 .role-badge.employee { color: var(--navy); }
 .role-badge.compliance { color: #8a6e37; }
 .role-badge.admin { color: var(--gold); }
+.role-select {
+  border: none;
+  background: transparent;
+  color: var(--navy);
+  font-size: 10px;
+  padding: 5px;
+  cursor: pointer;
+}
 
+.role-select:hover {
+  color: var(--gold);
+}
 .status-button { border: none; background: none; font-size: 9px; padding: 0; }
 .status-button.active { color: var(--green); }
 .status-button.inactive { color: #999; }

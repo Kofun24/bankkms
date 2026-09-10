@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
 import Documents from "./pages/Documents";
 import AuditLog from "./pages/AuditLog";
+import CustomerChat from "./pages/CustomerChat";
 import Layout from "./components/Layout";
 
 function ProtectedRoute({ children }) {
@@ -16,6 +17,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+      <Route path="/chat" element={<CustomerChat />} />
 
       <Route
         path="/admin"

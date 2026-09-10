@@ -7,6 +7,9 @@ export default function Employees() {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [actionError, setActionError] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
 
   async function loadEmployees() {
     setLoading(true);
@@ -29,27 +32,53 @@ export default function Employees() {
     employee.username.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleStatus = async (employee) => {
+  async function runConfirmedAction() {
+    if (!confirmAction) return;
+    setActionError("");
+    setActionLoading(true);
     try {
-      if (employee.is_active) {
-        await api.deactivateEmployee(employee.username);
-      } else {
-        await api.reactivateEmployee(employee.username);
-      }
+      await confirmAction.run();
+      setConfirmAction(null);
       loadEmployees();
     } catch (err) {
-      setError(err.message);
+        setActionError(err.message);
+    } finally {
+        setActionLoading(false);
     }
+  }
+
+  const askToggleStatus = (employee) => {
+    setActionError("");
+    setConfirmAction({
+      title: employee.is_active ? "Deactivate account?" : "Reactivate account?",
+      message: employee.is_active
+        ? `${employee.username} will no longer be able to log in. This can be reversed at any time.`
+        : `${employee.username} will be able to log in again.`,
+      confirmLabel: employee.is_active ? "Deactivate" : "Reactivate",
+      danger: employee.is_active,
+      run: () =>
+        employee.is_active
+          ? api.deactivateEmployee(employee.username)
+          : api.reactivateEmployee(employee.username),
+    });
   };
 
-  const promote = async (employee) => {
-    try {
-      await api.promoteEmployee(employee.username);
-      loadEmployees();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+  const askChangeRole = (employee, newRole) => {
+  setActionError("");
+  setConfirmAction({
+    title: `Change role to ${newRole}?`,
+    message: `${employee.username} will move from ${employee.role} to ${newRole}. ${
+      newRole === "admin"
+        ? "They will gain full system administration rights and lose knowledge-base query access."
+        : employee.role === "admin"
+        ? "They will lose administration rights."
+        : "This changes what knowledge-base tier they can access."
+    }`,
+    confirmLabel: `Change to ${newRole}`,
+    danger: employee.role === "admin" || newRole === "admin",
+    run: () => api.changeRole(employee.username, newRole),
+  });
+};
 
   return (
     <div>
@@ -115,15 +144,28 @@ export default function Employees() {
                     <div className="action-group">
                       <button
                         className={employee.is_active ? "table-action danger" : "table-action"}
-                        onClick={() => toggleStatus(employee)}
+                        onClick={() => askToggleStatus(employee)}
                       >
                         {employee.is_active ? "Deactivate" : "Reactivate"}
                       </button>
-                      {employee.role !== "admin" && (
-                        <button className="table-action" onClick={() => promote(employee)}>
-                          Promote to Admin
-                        </button>
-                      )}
+
+                      <select
+                        className="role-select"
+                          value=""
+                        onChange={(e) => {
+                          if (e.target.value) askChangeRole(employee, e.target.value);
+                          e.target.value = "";
+                        }}
+                      >
+                        <option value="" disabled>Change role…</option>
+                        {["employee", "compliance", "admin"]
+                          .filter((r) => r !== employee.role)
+                          .map((r) => (
+                            <option key={r} value={r}>
+                              {r.charAt(0).toUpperCase() + r.slice(1)}
+                            </option>
+                          ))}
+                      </select>
                     </div>
                   </td>
                 </tr>
@@ -145,6 +187,58 @@ export default function Employees() {
           }}
         />
       )}
+
+      {confirmAction && (
+        <ConfirmModal
+          {...confirmAction}
+          error={actionError}
+          loading={actionLoading}
+          onCancel={() => { setConfirmAction(null); setActionError(""); }}
+          onConfirm={runConfirmedAction}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConfirmModal({ title, message, confirmLabel, danger, error, loading, onCancel, onConfirm }) {
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ maxWidth: 420 }}>
+        <div className="modal-header">
+          <div>
+            <span className="eyebrow">CONFIRM ACTION</span>
+            <h2>{title}</h2>
+          </div>
+          <button className="close-button" onClick={onCancel}>×</button>
+        </div>
+
+        <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, marginBottom: error ? 16 : 28 }}>
+          {message}
+        </p>
+
+        {error && (
+          <div className="login-error" style={{ marginBottom: 20 }}>
+            <span>!</span>
+            {error}
+          </div>
+        )}
+
+        <div className="modal-actions">
+          <button type="button" className="secondary-button" onClick={onCancel} disabled={loading}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            style={danger ? { background: "var(--red)" } : {}}
+            onClick={onConfirm}
+            disabled={loading}
+          >
+            {loading ? "Working..." : confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

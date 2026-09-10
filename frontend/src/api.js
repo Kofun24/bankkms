@@ -4,6 +4,19 @@ function getToken() {
   return localStorage.getItem("bankkms_session");
 }
 
+async function publicRequest(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: { "Content-Type": "application/json", ...options.headers },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 async function request(path, options = {}) {
   const token = getToken();
   const headers = {
@@ -43,6 +56,12 @@ export const api = {
   promoteEmployee: (username) =>
     request(`/employees/${encodeURIComponent(username)}/promote`, { method: "POST" }),
 
+  changeRole: (username, newRole) =>
+    request(`/employees/${encodeURIComponent(username)}/change-role`, {
+      method: "POST",
+      body: JSON.stringify({ new_role: newRole }),
+    }),
+
   listDocuments: (currentOnly = false) =>
     request(`/documents?current_only=${currentOnly}`),
 
@@ -57,4 +76,12 @@ export const api = {
   verifyAuditChain: () => request("/audit-log/verify"),
 
   getDashboardStats: () => request("/dashboard-stats"),
+
+    startChatSession: () => publicRequest("/chat/new-session", { method: "POST" }),
+
+  sendChatMessage: (sessionId, message) =>
+    publicRequest("/chat", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId, message }),
+    }),
 };

@@ -7,7 +7,7 @@ functions as HTTP endpoints, for the Admin Console React frontend to call.
 Run from the repo root:
     python -m uvicorn backend.main:app --reload --port 8000
 """
-
+import uuid
 import sys
 from datetime import date
 from pathlib import Path
@@ -24,15 +24,17 @@ from pydantic import BaseModel
 from agent1_classification.admin_operations import (
     DocumentNotFoundError,
     EmployeeNotFoundError,
+    LastAdminError,
     admin_add_document,
     admin_add_employee,
+    admin_change_role,
     admin_deactivate_employee,
     admin_list_documents,
     admin_list_employees,
     admin_promote_to_admin,
     admin_reactivate_employee,
     admin_retire_document,
-)
+)    
 from agent1_classification.auth import (
     InvalidCredentialsError,
     UnauthorizedRoleError,
@@ -68,11 +70,12 @@ def handle_common_errors(fn, *args, **kwargs):
         return fn(*args, **kwargs)
     except UnauthorizedRoleError as e:
         raise HTTPException(status_code=403, detail=str(e))
+    except LastAdminError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except (EmployeeNotFoundError, DocumentNotFoundError) as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-
 
 # ---------------- Auth ----------------
 
@@ -169,6 +172,20 @@ def promote_employee(username: str, authorization: Optional[str] = Header(None))
     handle_common_errors(admin_promote_to_admin, session_id, username)
     return {"status": "promoted"}
 
+class ChangeRoleRequest(BaseModel):
+    new_role: str  # "employee" | "compliance" | "admin"
+
+
+@app.post("/api/employees/{username}/change-role")
+def change_role(username: str, payload: ChangeRoleRequest, authorization: Optional[str] = Header(None)):
+    session_id = get_session_id(authorization)
+    try:
+        new_role = UserRole(payload.new_role)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid role: {payload.new_role!r}")
+
+    handle_common_errors(admin_change_role, session_id, username, new_role)
+    return {"status": "role_changed"}
 
 # ---------------- Documents ----------------
 
@@ -297,3 +314,48 @@ def dashboard_stats(authorization: Optional[str] = Header(None)):
         total_documents=len(documents),
         restricted_documents=sum(1 for d in documents if d.access_level.value == "restricted"),
     )
+
+# ---------------- Customer Chat (public, no auth) ----------------
+
+class ChatRequest(BaseModel):
+    session_id: str
+    message: str
+
+
+class ChatResponse(BaseModel):
+    status: str
+    message_to_user: str
+    needs_clarification: bool = False
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(payload: ChatRequest):
+    """
+    Public endpoint — no Authorization header required. Anonymous
+    customer sessions are auto-provisioned by the pipeline itself
+    (require_query_access allows anonymous by design).
+    """
+    try:
+        from pipeline import run_pipeline
+    except ModuleNotFoundError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Query pipeline not available on this branch yet: {e}",
+        )
+
+    result = run_pipeline(payload.session_id, payload.message)
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result.get("message", result["error"]))
+
+    return ChatResponse(
+        status=result.get("status", "unknown"),
+        message_to_user=result.get("message_to_user", "Sorry, I couldn't process that."),
+        needs_clarification=result.get("status") == "needs_clarification",
+    )
+
+
+@app.post("/api/chat/new-session")
+def new_chat_session():
+    """Generates a fresh anonymous session token for a new customer visitor."""
+    return {"session_id": str(uuid.uuid4())}
