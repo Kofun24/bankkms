@@ -36,7 +36,10 @@ export default function CustomerChat() {
   }, []);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages]);
 
   async function handleSend(e) {
@@ -51,12 +54,18 @@ export default function CustomerChat() {
 
     try {
       const res = await api.sendChatMessage(sessionId, text);
-      setMessages((m) => [...m, { role: "assistant", text: res.message_to_user }]);
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: res.message_to_user },
+      ]);
     } catch (err) {
       setError(err.message);
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: "Sorry, something went wrong on our end. Please try again." },
+        {
+          role: "assistant",
+          text: "Sorry, something went wrong on our end. Please try again.",
+        },
       ]);
     } finally {
       setSending(false);
@@ -70,7 +79,9 @@ export default function CustomerChat() {
           <div className="cw-brand-mark">K</div>
           <div>
             <div className="cw-brand-name">BankKMS Assistant</div>
-            <div className="cw-brand-subtitle">Answers grounded in our official documentation</div>
+            <div className="cw-brand-subtitle">
+              Answers grounded in our official documentation
+            </div>
           </div>
         </div>
 
@@ -97,7 +108,11 @@ export default function CustomerChat() {
             onChange={(e) => setInput(e.target.value)}
             disabled={!sessionId || sending}
           />
-          <button className="cw-send" type="submit" disabled={!sessionId || sending || !input.trim()}>
+          <button
+            className="cw-send"
+            type="submit"
+            disabled={!sessionId || sending || !input.trim()}
+          >
             Send
           </button>
         </form>

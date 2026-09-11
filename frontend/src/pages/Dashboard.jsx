@@ -53,7 +53,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {error && <div className="login-error"><span>!</span>{error}</div>}
+      {error && (
+        <div className="login-error">
+          <span>!</span>
+          {error}
+        </div>
+      )}
 
       <div className="stat-grid">
         <div className="stat-card">
@@ -61,8 +66,12 @@ export default function Dashboard() {
             <span>USERS</span>
             <span className="stat-symbol">♙</span>
           </div>
-          <div className="stat-number">{stats ? stats.total_employees : "—"}</div>
-          <div className="stat-description">Employee, compliance & admin accounts</div>
+          <div className="stat-number">
+            {stats ? stats.total_employees : "—"}
+          </div>
+          <div className="stat-description">
+            Employee, compliance & admin accounts
+          </div>
         </div>
 
         <div className="stat-card">
@@ -70,7 +79,9 @@ export default function Dashboard() {
             <span>ACTIVE</span>
             <span className="stat-symbol">✓</span>
           </div>
-          <div className="stat-number">{stats ? stats.active_employees : "—"}</div>
+          <div className="stat-number">
+            {stats ? stats.active_employees : "—"}
+          </div>
           <div className="stat-description">
             {stats && stats.total_employees > 0
               ? `${Math.round((stats.active_employees / stats.total_employees) * 100)}% of all users`
@@ -83,7 +94,9 @@ export default function Dashboard() {
             <span>DOCUMENTS</span>
             <span className="stat-symbol">▤</span>
           </div>
-          <div className="stat-number">{stats ? stats.total_documents : "—"}</div>
+          <div className="stat-number">
+            {stats ? stats.total_documents : "—"}
+          </div>
           <div className="stat-description">Approved knowledge sources</div>
         </div>
 
@@ -92,7 +105,9 @@ export default function Dashboard() {
             <span>RESTRICTED</span>
             <span className="stat-symbol">◈</span>
           </div>
-          <div className="stat-number">{stats ? stats.restricted_documents : "—"}</div>
+          <div className="stat-number">
+            {stats ? stats.restricted_documents : "—"}
+          </div>
           <div className="stat-description">Compliance documents</div>
         </div>
       </div>
@@ -104,7 +119,9 @@ export default function Dashboard() {
               <span className="eyebrow">KNOWLEDGE BASE</span>
               <h2>Document registry</h2>
             </div>
-            <Link to="/admin/documents" className="text-link">View all →</Link>
+            <Link to="/admin/documents" className="text-link">
+              View all →
+            </Link>
           </div>
 
           <div className="document-list">
@@ -131,7 +148,9 @@ export default function Dashboard() {
               <span className="eyebrow">SYSTEM ACTIVITY</span>
               <h2>Recent events</h2>
             </div>
-            <Link to="/admin/audit" className="text-link">Audit log →</Link>
+            <Link to="/admin/audit" className="text-link">
+              Audit log →
+            </Link>
           </div>
 
           <div className="activity-list">
@@ -161,8 +180,8 @@ export default function Dashboard() {
             <em> approved knowledge.</em>
           </h2>
           <p>
-            Documents determine what the system knows. Access levels
-            determine who can see it. Administrators control both.
+            Documents determine what the system knows. Access levels determine
+            who can see it. Administrators control both.
           </p>
         </div>
       </section>

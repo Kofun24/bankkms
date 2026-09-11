@@ -29,7 +29,7 @@ export default function Employees() {
   }, []);
 
   const filtered = employees.filter((employee) =>
-    employee.username.toLowerCase().includes(search.toLowerCase())
+    employee.username.toLowerCase().includes(search.toLowerCase()),
   );
 
   async function runConfirmedAction() {
@@ -41,9 +41,9 @@ export default function Employees() {
       setConfirmAction(null);
       loadEmployees();
     } catch (err) {
-        setActionError(err.message);
+      setActionError(err.message);
     } finally {
-        setActionLoading(false);
+      setActionLoading(false);
     }
   }
 
@@ -64,21 +64,21 @@ export default function Employees() {
   };
 
   const askChangeRole = (employee, newRole) => {
-  setActionError("");
-  setConfirmAction({
-    title: `Change role to ${newRole}?`,
-    message: `${employee.username} will move from ${employee.role} to ${newRole}. ${
-      newRole === "admin"
-        ? "They will gain full system administration rights and lose knowledge-base query access."
-        : employee.role === "admin"
-        ? "They will lose administration rights."
-        : "This changes what knowledge-base tier they can access."
-    }`,
-    confirmLabel: `Change to ${newRole}`,
-    danger: employee.role === "admin" || newRole === "admin",
-    run: () => api.changeRole(employee.username, newRole),
-  });
-};
+    setActionError("");
+    setConfirmAction({
+      title: `Change role to ${newRole}?`,
+      message: `${employee.username} will move from ${employee.role} to ${newRole}. ${
+        newRole === "admin"
+          ? "They will gain full system administration rights and lose knowledge-base query access."
+          : employee.role === "admin"
+            ? "They will lose administration rights."
+            : "This changes what knowledge-base tier they can access."
+      }`,
+      confirmLabel: `Change to ${newRole}`,
+      danger: employee.role === "admin" || newRole === "admin",
+      run: () => api.changeRole(employee.username, newRole),
+    });
+  };
 
   return (
     <div>
@@ -93,7 +93,12 @@ export default function Employees() {
         </button>
       </div>
 
-      {error && <div className="login-error"><span>!</span>{error}</div>}
+      {error && (
+        <div className="login-error">
+          <span>!</span>
+          {error}
+        </div>
+      )}
 
       <div className="toolbar">
         <div className="search-box">
@@ -136,14 +141,22 @@ export default function Employees() {
                     </span>
                   </td>
                   <td>
-                    <span className={employee.is_active ? "status current" : "status retired"}>
+                    <span
+                      className={
+                        employee.is_active ? "status current" : "status retired"
+                      }
+                    >
                       {employee.is_active ? "● ACTIVE" : "○ INACTIVE"}
                     </span>
                   </td>
                   <td>
                     <div className="action-group">
                       <button
-                        className={employee.is_active ? "table-action danger" : "table-action"}
+                        className={
+                          employee.is_active
+                            ? "table-action danger"
+                            : "table-action"
+                        }
                         onClick={() => askToggleStatus(employee)}
                       >
                         {employee.is_active ? "Deactivate" : "Reactivate"}
@@ -151,13 +164,16 @@ export default function Employees() {
 
                       <select
                         className="role-select"
-                          value=""
+                        value=""
                         onChange={(e) => {
-                          if (e.target.value) askChangeRole(employee, e.target.value);
+                          if (e.target.value)
+                            askChangeRole(employee, e.target.value);
                           e.target.value = "";
                         }}
                       >
-                        <option value="" disabled>Change role…</option>
+                        <option value="" disabled>
+                          Change role…
+                        </option>
                         {["employee", "compliance", "admin"]
                           .filter((r) => r !== employee.role)
                           .map((r) => (
@@ -193,7 +209,10 @@ export default function Employees() {
           {...confirmAction}
           error={actionError}
           loading={actionLoading}
-          onCancel={() => { setConfirmAction(null); setActionError(""); }}
+          onCancel={() => {
+            setConfirmAction(null);
+            setActionError("");
+          }}
           onConfirm={runConfirmedAction}
         />
       )}
@@ -201,7 +220,16 @@ export default function Employees() {
   );
 }
 
-function ConfirmModal({ title, message, confirmLabel, danger, error, loading, onCancel, onConfirm }) {
+function ConfirmModal({
+  title,
+  message,
+  confirmLabel,
+  danger,
+  error,
+  loading,
+  onCancel,
+  onConfirm,
+}) {
   return (
     <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: 420 }}>
@@ -210,10 +238,19 @@ function ConfirmModal({ title, message, confirmLabel, danger, error, loading, on
             <span className="eyebrow">CONFIRM ACTION</span>
             <h2>{title}</h2>
           </div>
-          <button className="close-button" onClick={onCancel}>×</button>
+          <button className="close-button" onClick={onCancel}>
+            ×
+          </button>
         </div>
 
-        <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, marginBottom: error ? 16 : 28 }}>
+        <p
+          style={{
+            fontSize: 13,
+            color: "var(--muted)",
+            lineHeight: 1.6,
+            marginBottom: error ? 16 : 28,
+          }}
+        >
           {message}
         </p>
 
@@ -225,7 +262,12 @@ function ConfirmModal({ title, message, confirmLabel, danger, error, loading, on
         )}
 
         <div className="modal-actions">
-          <button type="button" className="secondary-button" onClick={onCancel} disabled={loading}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onCancel}
+            disabled={loading}
+          >
             Cancel
           </button>
           <button
@@ -267,7 +309,9 @@ function AddEmployeeModal({ close, onAdded }) {
             <span className="eyebrow">NEW ACCOUNT</span>
             <h2>Add user</h2>
           </div>
-          <button className="close-button" onClick={close}>×</button>
+          <button className="close-button" onClick={close}>
+            ×
+          </button>
         </div>
 
         <form onSubmit={submit}>
@@ -294,18 +338,34 @@ function AddEmployeeModal({ close, onAdded }) {
 
           <div className="input-group">
             <label>ACCESS ROLE</label>
-            <select className="form-input" value={role} onChange={(e) => setRole(e.target.value)}>
+            <select
+              className="form-input"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
               <option value="employee">Employee</option>
               <option value="compliance">Compliance</option>
             </select>
           </div>
 
-          <p style={{ fontSize: 10, color: "var(--muted)", marginTop: -14, marginBottom: 20 }}>
+          <p
+            style={{
+              fontSize: 10,
+              color: "var(--muted)",
+              marginTop: -14,
+              marginBottom: 20,
+            }}
+          >
             Admin accounts can't be created directly — promote an existing
             employee or compliance account instead.
           </p>
 
-          {error && <div className="login-error"><span>!</span>{error}</div>}
+          {error && (
+            <div className="login-error">
+              <span>!</span>
+              {error}
+            </div>
+          )}
 
           <div className="modal-actions">
             <button type="button" className="secondary-button" onClick={close}>
