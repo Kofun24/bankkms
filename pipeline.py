@@ -4,9 +4,10 @@ pipeline.py
 Top-level orchestration for the BankKMS pipeline. Wires agents together in
 sequence: Agent 1 -> Agent 2 -> Agent 3 -> Agent 4 (-> Agent 5/6 as hooks).
 
-Currently only Agent 1 is implemented. Agents 2-4 are stubbed as TODOs so
-the pipeline runs end-to-end (returning early after classification) without
-crashing, and can be extended agent-by-agent as teammates finish their parts.
+All four core agents are now wired. Agent 5 (audit logging) and Agent 6
+(escalation handoff) remain TODOs — hook them in where marked once they're
+ready, ideally right after Agent 4 returns (log every decision; route to
+Agent 6 specifically when decision == "escalated").
 """
 
 from agent1_classification.auth import (
@@ -17,20 +18,26 @@ from agent1_classification.auth import (
 from agent1_classification.classifier import classify_query
 from agent1_classification.gemini_classifier import gemini_classify
 from agent2_retrieval.retriever import Agent2Retriever
+from agent3_response.responder import analyze_and_respond
+from agent4_verification.db_integration import version_lookup_from_db
+from agent4_verification.verifier import run_agent4
 from shared.enums import UserRole
-from shared.schemas import Agent1Output, Agent2Output
+from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output
 
 # Instantiated once at import time — loading the embedder + vector store on
 # every query would be wasteful. Requires `python -m agent2_retrieval.ingest`
 # to have been run at least once so the index exists on disk.
 _agent2 = Agent2Retriever()
 
+
 def run_pipeline(session_id: str, raw_query: str) -> dict:
     """
     Runs the full BankKMS pipeline for a single user query.
 
-    Returns a dict with at least `agent1_output`. Once Agents 2-4 land,
-    this will also include `agent2_output`, `agent3_output`, `final_response`.
+    Returns a dict with at least `agent1_output`. On a normal completed
+    run it also includes `agent2_output`, `agent3_output`, `agent4_output`,
+    and `final_response` (the actual text/citations the caller should show
+    the user, already access-controlled and fact-checked by Agent 4).
     """
     try:
         agent1_output: Agent1Output = classify_query(
@@ -58,26 +65,54 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
 
     agent2_output: Agent2Output = _agent2.run(agent1_output)
 
-    # TODO (Agent 3 owner): call response synthesis here
-    # agent3_output = generate_response(agent2_output)
+    agent3_output: Agent3Output = analyze_and_respond(agent2_output)
 
-    # TODO (Agent 4 owner): call verification here
-    # agent4_output = verify_response(agent3_output, agent1_output)
+    agent4_output: Agent4Output = run_agent4(
+        agent1_output, agent2_output, agent3_output,
+        version_lookup=version_lookup_from_db,
+    )
+
+    # TODO (Agent 5 owner): log this decision to the audit_log table here,
+    # e.g. log_decision(stage="verification", agent="Agent 4",
+    # payload_snapshot=agent4_output.model_dump(), ...). Ideally log every
+    # stage (classification, retrieval, generation, verification), not
+    # just the final one — see database/models.py AuditLog.stage enum.
+
+    # TODO (Agent 6 owner): when agent4_output.decision == "escalated",
+    # route to human review here instead of just returning the status.
+
+    if agent4_output.decision.value == "approved":
+        status = "answered"
+        message_to_user = agent4_output.final_answer
+    elif agent4_output.decision.value == "denied":
+        status = "denied"
+        message_to_user = (
+            "I can't provide that information — it may be outside what "
+            "you're authorized to access, or I don't have reliable "
+            "information to answer confidently."
+        )
+    else:  # escalated
+        status = "escalated"
+        message_to_user = (
+            "This needs a closer look before I can answer confidently. "
+            "It's been flagged for review."
+        )
 
     return {
-    "agent1_output": agent1_output,
-    "agent2_output": agent2_output,
-    "status": "retrieved_awaiting_synthesis",
-    "message_to_user": (
-        "Query classified and knowledge retrieved. "
-        "Response synthesis not yet connected."
-    ),
-}
+        "agent1_output": agent1_output,
+        "agent2_output": agent2_output,
+        "agent3_output": agent3_output,
+        "agent4_output": agent4_output,
+        "status": status,
+        "message_to_user": message_to_user,
+        "final_response": {
+            "answer": agent4_output.final_answer,
+            "citations": agent4_output.final_citations,
+        } if agent4_output.decision.value == "approved" else None,
+    }
 
 
 if __name__ == "__main__":
-    import json
-
     # Manual smoke test — run: python pipeline.py
     register_session("demo_session", UserRole.CUSTOMER)
 
@@ -114,4 +149,32 @@ if __name__ == "__main__":
         print(f"Results ({len(a2.results)}):")
         for r in a2.results:
             print(f"  - [{r.doc_access_level.value}] {r.doc_title} / {r.source_section} (score={r.similarity_score})")
+
+    if "agent3_output" in result:
+        a3 = result["agent3_output"]
+        print("\n--- Agent 3 Output ---")
+        print(f"Grounded?:       {a3.grounded}")
+        print(f"Citations:       {len(a3.citations)}")
+        print(f"Chunks Used:     {a3.chunks_used}")
+        print(f"Answer (draft):  {a3.answer_text}")
+
+    if "agent4_output" in result:
+        a4 = result["agent4_output"]
+        print("\n--- Agent 4 Output ---")
+        print(f"Decision:            {a4.decision.value}")
+        print(f"Denial Reason:       {a4.denial_reason}")
+        print(f"Evidence Sufficient: {a4.evidence_sufficiency.value}")
+        print(f"Factual Check:       {a4.factual_support_check.value}")
+        print(f"Version Conflict?:   {a4.version_conflict_detected}")
+        if a4.version_conflict_detected:
+            print(f"Conflict Details:    {a4.conflict_details}")
+        print(f"Access Reconfirmed?: {a4.access_reconfirmed}")
+        print(f"Confidence:          {a4.confidence}")
+        if a4.final_answer:
+            print(f"\nFINAL ANSWER: {a4.final_answer}")
+            for c in a4.final_citations:
+                print(f"  source: {c.doc_title} ({c.section})")
+        else:
+            print(f"\nFINAL ANSWER: [withheld — {a4.decision.value}]")
+
     print("------------------------\n")
