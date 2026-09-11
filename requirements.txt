@@ -1,9 +1,6 @@
 python-dotenv
 google-genai
-chromadb
 sentence-transformers
-fastapi
-uvicorn
 pydantic
 sqlalchemy
 psycopg2-binary
@@ -11,3 +8,9 @@ pgvector
 alembic
 passlib
 bcrypt==4.0.1
+fastapi
+uvicorn
+pytest
+scikit-learn
+pyyaml
+

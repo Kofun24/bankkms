@@ -23,11 +23,7 @@ from typing import Optional
 from shared.enums import EscalationReason, Priority, VerificationDecision
 from shared.schemas import Agent4Output, Agent6Output
 
-# Below this confidence, an "approved" or "escalated" answer from Agent 4
-# is treated as too shaky to hand straight to the user without human review.
-# Kept separate from Agent 3's CONFIDENCE_THRESHOLD (chunk relevance) since
-# this gates a different decision — whether to escalate, not whether to
-# discard a chunk.
+# Threshold used to decide when Agent 4's confidence is too low
 ESCALATION_CONFIDENCE_THRESHOLD = 0.5
 
 
@@ -35,6 +31,7 @@ ESCALATION_CONFIDENCE_THRESHOLD = 0.5
 # Trigger checks — each returns True/False for whether ITS condition fired.
 # ---------------------------------------------------------------------------
 
+# Check whether Agent 4's confidence is below the escalation threshold
 def check_low_confidence_trigger(agent4_output: Agent4Output) -> bool:
     """Member 3 / Agent 3 owner's contribution.
 
@@ -45,6 +42,7 @@ def check_low_confidence_trigger(agent4_output: Agent4Output) -> bool:
     return agent4_output.confidence < ESCALATION_CONFIDENCE_THRESHOLD
 
 
+# Check whether Agent 4 detected conflicting document versions
 def check_version_conflict_trigger(agent4_output: Agent4Output) -> bool:
     """Member 4 / Agent 4 owner's contribution.
 
@@ -54,6 +52,7 @@ def check_version_conflict_trigger(agent4_output: Agent4Output) -> bool:
     return agent4_output.version_conflict_detected
 
 
+# Placeholder for future suspicious-pattern detection
 def check_suspicious_pattern_trigger(agent4_output: Agent4Output) -> bool:
     """TODO (Member 1 / Agent 1 owner): needs session-level flags
     (e.g. agent1_output.flags.possible_injection_attempt across the
@@ -61,6 +60,7 @@ def check_suspicious_pattern_trigger(agent4_output: Agent4Output) -> bool:
     return False
 
 
+# Placeholder for future repeated-denial detection
 def check_repeated_denial_trigger(agent4_output: Agent4Output) -> bool:
     """TODO (whoever owns session/audit history, likely tied to Agent 5):
     needs a count of prior 'denied' decisions for this session_id, not
@@ -72,9 +72,7 @@ def check_repeated_denial_trigger(agent4_output: Agent4Output) -> bool:
 # Trigger resolution
 # ---------------------------------------------------------------------------
 
-# Checked in this order; first match wins. Order reflects rough severity —
-# a version conflict is more actionable/specific than a vague low-confidence
-# signal, so it's surfaced first if both happen to be true at once.
+# Define trigger order and the check used for each escalation reason
 _TRIGGER_CHECKS: list[tuple[EscalationReason, callable]] = [
     (EscalationReason.VERSION_CONFLICT, check_version_conflict_trigger),
     (EscalationReason.SUSPICIOUS_PATTERN, check_suspicious_pattern_trigger),
@@ -82,6 +80,7 @@ _TRIGGER_CHECKS: list[tuple[EscalationReason, callable]] = [
     (EscalationReason.LOW_CONFIDENCE, check_low_confidence_trigger),
 ]
 
+# Assign escalation priority based on the detected reason
 _PRIORITY_BY_REASON = {
     EscalationReason.SUSPICIOUS_PATTERN: Priority.HIGH,
     EscalationReason.VERSION_CONFLICT: Priority.MEDIUM,
@@ -89,6 +88,7 @@ _PRIORITY_BY_REASON = {
     EscalationReason.LOW_CONFIDENCE: Priority.LOW,
 }
 
+# Define the user-facing message for each escalation reason
 _USER_MESSAGE_BY_REASON = {
     EscalationReason.LOW_CONFIDENCE: (
         "We want to make sure you get an accurate answer, so this question "
@@ -111,6 +111,7 @@ _USER_MESSAGE_BY_REASON = {
 }
 
 
+# Check all triggers and return the first matching escalation reason
 def determine_trigger_reason(agent4_output: Agent4Output) -> Optional[EscalationReason]:
     """Runs all trigger checks in priority order, returns the first reason
     that fires, or None if nothing warrants escalation."""
@@ -124,6 +125,7 @@ def determine_trigger_reason(agent4_output: Agent4Output) -> Optional[Escalation
 # Main entry point
 # ---------------------------------------------------------------------------
 
+# Main Agent 6 workflow: determine whether the request needs human escalation
 def evaluate_escalation(agent4_output: Agent4Output) -> Agent6Output:
     """Main entry point for Agent 6.
 
@@ -134,6 +136,7 @@ def evaluate_escalation(agent4_output: Agent4Output) -> Agent6Output:
     """
     reason = determine_trigger_reason(agent4_output)
 
+    # Return normally when no escalation condition is detected
     if reason is None and agent4_output.decision != VerificationDecision.ESCALATED:
         return Agent6Output(
             session_id=agent4_output.session_id,
@@ -144,12 +147,11 @@ def evaluate_escalation(agent4_output: Agent4Output) -> Agent6Output:
             priority=Priority.LOW,
         )
 
-    # Agent 4 already said 'escalated' but no specific trigger matched here
-    # (e.g. a reason type not yet implemented) — fall back to low_confidence
-    # as the most defensible default rather than leaving it unexplained.
+    # Use a default reason if Agent 4 escalated without a detected trigger
     if reason is None:
         reason = EscalationReason.LOW_CONFIDENCE
 
+    # Return the structured escalation result for human review
     return Agent6Output(
         session_id=agent4_output.session_id,
         escalation_triggered=True,
@@ -161,7 +163,7 @@ def evaluate_escalation(agent4_output: Agent4Output) -> Agent6Output:
 
 
 if __name__ == "__main__":
-    # Manual smoke test — mirrors a low-confidence Agent4Output.
+    # Simple manual test for low-confidence and normal cases
     from datetime import datetime
 
     mock_low_confidence = Agent4Output(

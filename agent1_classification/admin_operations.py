@@ -37,6 +37,9 @@ class EmployeeNotFoundError(Exception):
     """Raised when an operation references a username that doesn't exist."""
     pass
 
+class LastAdminError(Exception):
+    """Raised when an action would leave zero active admin accounts."""
+    pass
 
 @dataclass
 class EmployeeSummary:
@@ -103,12 +106,48 @@ def admin_promote_to_admin(admin_session_id: str, username: str) -> None:
     finally:
         db.close()
 
+def admin_demote_from_admin(admin_session_id: str, username: str, new_role: UserRole) -> None:
+    """
+    Demotes an Admin account back to employee or compliance. Requires an
+    authenticated Admin session. Deliberately requires specifying the
+    target role explicitly (not just "remove admin") since there's no
+    single obvious default to demote *to* — the caller must choose.
+
+    Safety note: this does not prevent an admin from demoting themselves,
+    including the last remaining admin account. In production, this
+    should be guarded against separately (e.g. checking at least one
+    other active admin exists) — flagged here as a known gap.
+    """
+    require_admin(admin_session_id)
+
+    if new_role not in (UserRole.EMPLOYEE, UserRole.COMPLIANCE):
+        raise UnauthorizedRoleError(
+            "admin_demote_from_admin can only demote to employee or compliance."
+        )
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if user is None:
+            raise EmployeeNotFoundError(f"No account found for username={username!r}")
+
+        if user.role != DBUserRole.ADMIN:
+            raise ValueError(f"{username!r} is not currently an admin.")
+
+        user.role = DBUserRole(new_role.value)
+        db.commit()
+    finally:
+        db.close()
 
 def admin_deactivate_employee(admin_session_id: str, username: str) -> None:
     """
     Deactivates an account (soft delete — is_active=False), rather than
     deleting the row outright. Preserves history for audit purposes and
     avoids breaking foreign-key references from past sessions.
+
+    Safety guard: refuses to deactivate the last remaining active admin,
+    for the same reason admin_change_role() guards against removing the
+    last admin's role.
     """
     require_admin(admin_session_id)
 
@@ -118,11 +157,67 @@ def admin_deactivate_employee(admin_session_id: str, username: str) -> None:
         if user is None:
             raise EmployeeNotFoundError(f"No account found for username={username!r}")
 
+        if user.role == DBUserRole.ADMIN:
+            active_admin_count = (
+                db.query(User)
+                .filter(User.role == DBUserRole.ADMIN, User.is_active == True)  # noqa: E712
+                .count()
+            )
+            if active_admin_count <= 1:
+                raise LastAdminError(
+                    f"Cannot deactivate {username!r} — they are the last "
+                    "remaining active admin."
+                )
+
         user.is_active = False
         db.commit()
     finally:
         db.close()
 
+def admin_change_role(admin_session_id: str, username: str, new_role: UserRole) -> None:
+    """
+    Changes any account's role to any other non-customer role — the
+    general-purpose version of promote/demote, supporting lateral moves
+    (employee <-> compliance) as well as admin promotion/demotion.
+
+    Customers are still excluded entirely (no account exists for them).
+
+    Safety guard: refuses to change the role of the last remaining active
+    admin account away from admin. Without this, an admin could
+    accidentally lock everyone (including themselves) out of all admin
+    functions, with no way back in short of direct database access.
+    """
+    require_admin(admin_session_id)
+
+    if new_role == UserRole.CUSTOMER:
+        raise UnauthorizedRoleError("Cannot set a user account's role to customer.")
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if user is None:
+            raise EmployeeNotFoundError(f"No account found for username={username!r}")
+
+        if user.role.value == new_role.value:
+            raise ValueError(f"{username!r} already has the role {new_role.value!r}.")
+
+        if user.role == DBUserRole.ADMIN and new_role != UserRole.ADMIN:
+            active_admin_count = (
+                db.query(User)
+                .filter(User.role == DBUserRole.ADMIN, User.is_active == True)  # noqa: E712
+                .count()
+            )
+            if active_admin_count <= 1:
+                raise LastAdminError(
+                    f"Cannot change {username!r}'s role — they are the last "
+                    "remaining active admin. Promote another account to "
+                    "admin first."
+                )
+
+        user.role = DBUserRole(new_role.value)
+        db.commit()
+    finally:
+        db.close()
 
 def admin_reactivate_employee(admin_session_id: str, username: str) -> None:
     """Reverses a deactivation."""
