@@ -49,7 +49,12 @@ export default function AuditLog() {
         )}
       </div>
 
-      {error && <div className="login-error"><span>!</span>{error}</div>}
+      {error && (
+        <div className="login-error">
+          <span>!</span>
+          {error}
+        </div>
+      )}
 
       <div className="audit-summary">
         <div>
@@ -85,10 +90,15 @@ export default function AuditLog() {
             {!loading &&
               logs.map((log) => (
                 <tr key={log.id}>
-                  <td className="timestamp">{new Date(log.timestamp).toLocaleString()}</td>
+                  <td className="timestamp">
+                    {new Date(log.timestamp).toLocaleString()}
+                  </td>
                   <td className="muted-cell">{log.session_id.slice(0, 12)}…</td>
                   <td>
-                    <span className="role-badge employee" style={{ textTransform: "capitalize" }}>
+                    <span
+                      className="role-badge employee"
+                      style={{ textTransform: "capitalize" }}
+                    >
                       {log.stage}
                     </span>
                   </td>
@@ -100,14 +110,20 @@ export default function AuditLog() {
         </table>
         {loading && <p style={{ padding: 20 }}>Loading...</p>}
         {!loading && logs.length === 0 && (
-          <p style={{ padding: 20, color: "var(--muted)" }}>No audit records yet.</p>
+          <p style={{ padding: 20, color: "var(--muted)" }}>
+            No audit records yet.
+          </p>
         )}
       </div>
 
       {chainStatus && (
         <div
           className="audit-integrity"
-          style={!chainStatus.intact ? { background: "var(--red-light)", borderColor: "#d9b8b3" } : {}}
+          style={
+            !chainStatus.intact
+              ? { background: "var(--red-light)", borderColor: "#d9b8b3" }
+              : {}
+          }
         >
           <div
             className="integrity-icon"

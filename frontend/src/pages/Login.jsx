@@ -48,8 +48,8 @@ export default function Login() {
           </h1>
           <p>
             BankKMS gives financial institutions control over the knowledge
-            their people access, while ensuring every answer remains grounded
-            in approved documentation.
+            their people access, while ensuring every answer remains grounded in
+            approved documentation.
           </p>
           <div className="login-line"></div>
           <div className="login-footer-text">
