@@ -9,18 +9,24 @@ plan). This agent does not decide anything; it only observes and records
 what Agents 1-4 already decided, so a compromised or buggy earlier agent
 can't also hide its own tracks by skipping a log entry.
 
-Storage: append-only JSONL, one shared.schemas.AuditLogRecord per line.
-"Immutable" here means hash-chained, not physically write-once: each
-record's `immutable_hash` is a SHA-256 over that record's own content
-plus the *previous* record's hash. Altering any record (or deleting one
-from the middle) breaks the chain from that point forward, so
-verify_chain() can detect and pinpoint tampering after the fact. This is
-the same principle a blockchain uses, without needing one.
+Storage backend is pluggable — see config.AUDIT_LOG_BACKEND:
+  - "file" (default): append-only JSONL, one shared.schemas.AuditLogRecord
+    per line. Zero DB dependency; what every existing test uses.
+  - "db": the real Postgres `audit_log` table, via db_storage.py.
 
-Concurrency note: this module assumes a single writer process (fine for
-this project's scope). It is not safe for multiple processes appending
-to the same log file concurrently — a production version would need a
-file lock or a proper append-only store.
+"Immutable" means hash-chained, not physically write-once: each record's
+`immutable_hash` is a SHA-256 over that record's own content plus the
+*previous* record's hash. Altering any record (or deleting one from the
+middle) breaks the chain from that point forward, so verify_chain() can
+detect and pinpoint tampering after the fact — same principle as a
+blockchain, without needing one.
+
+Every public function below (compute_hash, append_record,
+read_all_records, verify_chain, and the four log_* wrappers) keeps the
+exact same signature regardless of backend, so callers/tests never need
+to know or care which one is active. `log_path`, when passed explicitly,
+always forces the file backend at that path — this is what the existing
+test suite relies on for per-test isolation, and it's untouched here.
 """
 
 from __future__ import annotations
@@ -32,7 +38,7 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
-from agent5_audit_logging.config import AUDIT_LOG_PATH
+from agent5_audit_logging.config import AUDIT_LOG_BACKEND, AUDIT_LOG_PATH
 from shared.enums import LogStage
 from shared.schemas import (
     Agent1Output,
@@ -46,7 +52,7 @@ GENESIS_HASH = "0" * 64  # hash "before" the first record in any chain
 
 
 # --------------------------------------------------------------------------
-# Hashing
+# Hashing — backend-agnostic, unchanged
 # --------------------------------------------------------------------------
 
 def _canonical_json(record: AuditLogRecord) -> str:
@@ -69,7 +75,7 @@ def compute_hash(record: AuditLogRecord, prev_hash: str) -> str:
 
 
 # --------------------------------------------------------------------------
-# Storage
+# File backend (original implementation, unchanged)
 # --------------------------------------------------------------------------
 
 def _read_lines(log_path: str) -> list[str]:
@@ -93,15 +99,86 @@ def _append_line(record: AuditLogRecord, log_path: str) -> None:
         f.write(record.model_dump_json() + "\n")
 
 
+def _append_record_file(
+    stage: LogStage, agent: str, session_id: str,
+    payload_snapshot: dict, decision_summary: str, path: str,
+) -> AuditLogRecord:
+    prev_hash = _get_last_hash(path)
+    record = AuditLogRecord(
+        log_id=str(uuid4()),
+        session_id=session_id,
+        stage=stage,
+        agent=agent,
+        payload_snapshot=payload_snapshot,
+        decision_summary=decision_summary,
+        immutable_hash="",  # placeholder; _canonical_json excludes it anyway
+    )
+    record.immutable_hash = compute_hash(record, prev_hash)
+    _append_line(record, path)
+    return record
+
+
+# --------------------------------------------------------------------------
+# Core entry points — dispatch between file and DB backends
+# --------------------------------------------------------------------------
+
+def append_record(
+    stage: LogStage,
+    agent: str,
+    session_id: str,
+    payload_snapshot: dict,
+    decision_summary: str,
+    log_path: Optional[str] = None,
+) -> AuditLogRecord:
+    """Appends one audit record to the chain and returns it.
+
+    `log_path`: if given, ALWAYS uses the file backend at that path,
+    regardless of AUDIT_LOG_BACKEND — this is what tests rely on for
+    isolation (a fresh tmp_path per test). If omitted, uses whichever
+    backend config.AUDIT_LOG_BACKEND selects (file backend falls back to
+    the shared AUDIT_LOG_PATH default, same as before this file changed).
+    """
+    if log_path is not None or AUDIT_LOG_BACKEND == "file":
+        path = log_path or AUDIT_LOG_PATH
+        return _append_record_file(stage, agent, session_id, payload_snapshot, decision_summary, path)
+
+    # DB backend
+    from agent5_audit_logging.db_storage import db_append_atomic
+
+    def _build(prev_hash: str) -> AuditLogRecord:
+        record = AuditLogRecord(
+            log_id=str(uuid4()),
+            session_id=session_id,
+            stage=stage,
+            agent=agent,
+            payload_snapshot=payload_snapshot,
+            decision_summary=decision_summary,
+            immutable_hash="",
+        )
+        record.immutable_hash = compute_hash(record, prev_hash)
+        return record
+
+    return db_append_atomic(_build)
+
+
 def read_all_records(log_path: Optional[str] = None) -> list[AuditLogRecord]:
-    """Reads every record currently in the log, in append order."""
-    path = log_path or AUDIT_LOG_PATH
-    return [AuditLogRecord.model_validate_json(line) for line in _read_lines(path)]
+    """Reads every record currently in the log, in append order.
+
+    `log_path`: if given, always reads that file, regardless of backend
+    config (test isolation, same as append_record). If omitted, reads
+    from whichever backend is configured.
+    """
+    if log_path is not None or AUDIT_LOG_BACKEND == "file":
+        path = log_path or AUDIT_LOG_PATH
+        return [AuditLogRecord.model_validate_json(line) for line in _read_lines(path)]
+
+    from agent5_audit_logging.db_storage import db_read_all
+    return db_read_all()
 
 
 def verify_chain(log_path: Optional[str] = None) -> tuple[bool, list[dict]]:
     """Recomputes each record's hash from its content + the *previous
-    record's stored hash* and compares it to what's on disk.
+    record's stored hash* and compares it to what's on disk/in the DB.
 
     Deliberately continues the chain using each record's *stored* hash
     (not the recomputed one) even after a mismatch — this isolates
@@ -110,7 +187,8 @@ def verify_chain(log_path: Optional[str] = None) -> tuple[bool, list[dict]]:
 
     Returns (is_intact, broken_records) where broken_records is a list of
     {"index", "log_id", "stage", "expected_hash", "actual_hash"} dicts —
-    empty if the chain is fully intact.
+    empty if the chain is fully intact. Backend-agnostic: driven entirely
+    by read_all_records(), so it works identically for either backend.
     """
     records = read_all_records(log_path)
     prev_hash = GENESIS_HASH
@@ -134,47 +212,9 @@ def verify_chain(log_path: Optional[str] = None) -> tuple[bool, list[dict]]:
 
 
 # --------------------------------------------------------------------------
-# Core entry point
+# Per-agent convenience wrappers (unchanged — dispatch happens inside
+# append_record, so these need no backend awareness at all)
 # --------------------------------------------------------------------------
-
-def append_record(
-    stage: LogStage,
-    agent: str,
-    session_id: str,
-    payload_snapshot: dict,
-    decision_summary: str,
-    log_path: Optional[str] = None,
-) -> AuditLogRecord:
-    """Appends one audit record to the chain and returns it.
-
-    `log_path` is only for tests / isolated runs — production code should
-    rely on the AUDIT_LOG_PATH default from config.py so every stage
-    writes to the same chain.
-    """
-    path = log_path or AUDIT_LOG_PATH
-    prev_hash = _get_last_hash(path)
-
-    record = AuditLogRecord(
-        log_id=str(uuid4()),
-        session_id=session_id,
-        stage=stage,
-        agent=agent,
-        payload_snapshot=payload_snapshot,
-        decision_summary=decision_summary,
-        immutable_hash="",  # placeholder; _canonical_json excludes it anyway
-    )
-    record.immutable_hash = compute_hash(record, prev_hash)
-
-    _append_line(record, path)
-    return record
-
-
-# --------------------------------------------------------------------------
-# Per-agent convenience wrappers
-# --------------------------------------------------------------------------
-# These exist so pipeline.py's future wiring is a one-line call after each
-# agent runs (log_classification(agent1_output), etc.) instead of hand-
-# building payload_snapshot/decision_summary at every call site.
 
 def log_classification(
     agent1_output: Agent1Output, log_path: Optional[str] = None
@@ -252,6 +292,9 @@ def log_verification(
 
 # --------------------------------------------------------------------------
 # Manual smoke test — run with: python -m agent5_audit_logging.logger
+# Always uses the file backend (explicit log_path), regardless of your
+# .env AUDIT_LOG_BACKEND setting, so this stays a safe local sanity check.
+# For a DB-backend smoke test, see tests/test_agent5/test_db_backend.py.
 # --------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -292,9 +335,6 @@ if __name__ == "__main__":
     print(f"Chain intact: {ok}")
     print(f"Records: {len(read_all_records(demo_path))}\n")
 
-    # Demonstrate tamper detection: alter one record's decision_summary
-    # directly on disk (simulating someone editing the log file by hand)
-    # and re-verify.
     print("--- Simulating tampering with record #2 (retrieval) ---")
     lines = _read_lines(demo_path)
     tampered = json.loads(lines[1])

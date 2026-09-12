@@ -25,7 +25,11 @@ from agent5_audit_logging.logger import (
     log_retrieval,
     log_verification,
 )
+<<<<<<< Updated upstream
 from shared.enums import UserRole, VerificationDecision
+=======
+from shared.enums import UserRole
+>>>>>>> Stashed changes
 from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output
 
 
@@ -111,8 +115,43 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
     agent4_output: Agent4Output = run_agent4(agent1_output, agent2_output, agent3_output)
     _safe_log(log_verification, agent4_output)
 
+<<<<<<< Updated upstream
     # TODO (Agent 4 owner): call verification here
     # agent4_output = verify_response(agent3_output, agent1_output)
+=======
+    agent4_output: Agent4Output = run_agent4(
+        agent1_output, agent2_output, agent3_output,
+        version_lookup=version_lookup_from_db,
+    )
+
+    # Every stage gets logged independently, not just the final decision —
+    # so a compromised/buggy earlier agent can't also hide its own tracks
+    # by the pipeline skipping a log entry on its behalf.
+    log_classification(agent1_output)
+    log_retrieval(agent2_output)
+    log_generation(agent3_output)
+    log_verification(agent4_output)
+
+    # TODO (Agent 6 owner): when agent4_output.decision == "escalated",
+    # route to human review here instead of just returning the status.
+
+    if agent4_output.decision.value == "approved":
+        status = "answered"
+        message_to_user = agent4_output.final_answer
+    elif agent4_output.decision.value == "denied":
+        status = "denied"
+        message_to_user = (
+            "I can't provide that information — it may be outside what "
+            "you're authorized to access, or I don't have reliable "
+            "information to answer confidently."
+        )
+    else:  # escalated
+        status = "escalated"
+        message_to_user = (
+            "This needs a closer look before I can answer confidently. "
+            "It's been flagged for review."
+        )
+>>>>>>> Stashed changes
 
     return {
         "agent1_output": agent1_output,
