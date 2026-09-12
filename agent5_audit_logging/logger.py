@@ -4,11 +4,17 @@ agent5_audit_logging/logger.py
 Agent 5 — Audit & Compliance Logging
 
 Independently logs every query, classification, retrieval, access
-decision, and final answer — timestamped and immutable (per the project
-plan). This agent does not decide anything; it only observes and records
-what Agents 1-4 already decided, so a compromised or buggy earlier agent
-can't also hide its own tracks by skipping a log entry.
+decision, and final answer — timestamped and immutable. This agent does
+not decide anything; it only observes and records what Agents 1-4 already
+decided, so a compromised or buggy earlier agent can't also hide its own
+tracks by skipping a log entry.
 
+Storage: the `audit_log` table in the shared Postgres database (see
+database/models.py::AuditLog). One continuous, GLOBAL hash chain across
+the whole system — not per-session — which matches how a real compliance
+audit trail should work: a single ledger, not one that resets per user.
+
+<<<<<<< Updated upstream
 Storage backend is pluggable — see config.AUDIT_LOG_BACKEND:
   - "file" (default): append-only JSONL, one shared.schemas.AuditLogRecord
     per line. Zero DB dependency; what every existing test uses.
@@ -27,18 +33,52 @@ exact same signature regardless of backend, so callers/tests never need
 to know or care which one is active. `log_path`, when passed explicitly,
 always forces the file backend at that path — this is what the existing
 test suite relies on for per-test isolation, and it's untouched here.
+=======
+"Immutable" here means hash-chained, not physically write-once: each
+record's `immutable_hash` is a SHA-256 over that record's own content
+plus the *previous* record's hash (now an explicit `prev_hash` column,
+rather than implied by file-line order as in the earlier JSONL
+prototype). Altering any record — or deleting one from the middle —
+breaks the chain from that point forward, so verify_chain() can detect
+and pinpoint tampering after the fact.
+
+Testing note: verify_chain()'s tests deliberately corrupt records to
+prove tampering is caught. Running that against the REAL shared
+production audit_log table would actually corrupt real audit history for
+the whole team — the opposite of what an immutable log is for. To avoid
+this, the DB session is injectable: production code uses the real
+SessionLocal by default; tests pass an isolated in-memory SQLite session
+factory instead (see tests/test_agent5/conftest.py). Same table schema,
+zero risk to shared data.
+
+Concurrency note: this assumes reasonably low write concurrency (fine for
+this project's scope). Postgres's own row insert ordering (the `id`
+autoincrement sequence) gives a reliable global order even with multiple
+writers, which is actually a step up from the JSONL version's
+single-writer assumption — but there's still a narrow race between
+"read the last hash" and "insert using it" if two processes log
+simultaneously. Not addressed here; a production version would wrap the
+read-last-hash + insert in a single transaction with a row lock.
+>>>>>>> Stashed changes
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import os
-from pathlib import Path
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Callable, Optional
 from uuid import uuid4
 
+<<<<<<< Updated upstream
 from agent5_audit_logging.config import AUDIT_LOG_BACKEND, AUDIT_LOG_PATH
+=======
+from sqlalchemy.orm import Session as DBSession
+
+from database.config import SessionLocal
+from database.models import AuditLog as DBAuditLog
+from database.models import AuditStage as DBAuditStage
+>>>>>>> Stashed changes
 from shared.enums import LogStage
 from shared.schemas import (
     Agent1Output,
@@ -49,6 +89,26 @@ from shared.schemas import (
 )
 
 GENESIS_HASH = "0" * 64  # hash "before" the first record in any chain
+
+# A session_factory is any zero-arg callable returning a SQLAlchemy Session
+# (SessionLocal itself satisfies this). Injectable so tests can point at an
+# isolated engine instead of the real shared database.
+SessionFactory = Callable[[], DBSession]
+
+
+# --------------------------------------------------------------------------
+# Stage conversion — shared.enums.LogStage <-> database.models.AuditStage
+# --------------------------------------------------------------------------
+# Two distinct Enum classes for the same concept, same pattern Agent 2's
+# vector_store.py already established for AccessLevel: convert explicitly
+# at the DB boundary rather than relying on them comparing equal implicitly.
+
+def _to_db_stage(stage: LogStage) -> DBAuditStage:
+    return DBAuditStage(stage.value)
+
+
+def _to_shared_stage(db_stage: DBAuditStage) -> LogStage:
+    return LogStage(db_stage.value)
 
 
 # --------------------------------------------------------------------------
@@ -75,30 +135,42 @@ def compute_hash(record: AuditLogRecord, prev_hash: str) -> str:
 
 
 # --------------------------------------------------------------------------
+<<<<<<< Updated upstream
 # File backend (original implementation, unchanged)
+=======
+# Storage — DB-backed
+>>>>>>> Stashed changes
 # --------------------------------------------------------------------------
 
-def _read_lines(log_path: str) -> list[str]:
-    if not os.path.exists(log_path):
-        return []
-    with open(log_path, "r", encoding="utf-8") as f:
-        return [line for line in f.read().splitlines() if line.strip()]
+def _db_row_to_record(row: DBAuditLog) -> AuditLogRecord:
+    return AuditLogRecord(
+        log_id=str(row.log_id),
+        session_id=row.session_id,
+        stage=_to_shared_stage(row.stage),
+        agent=row.agent,
+        payload_snapshot=row.payload_snapshot,
+        decision_summary=row.decision_summary,
+        timestamp=row.timestamp,
+        immutable_hash=row.immutable_hash,
+    )
 
 
-def _get_last_hash(log_path: str) -> str:
-    lines = _read_lines(log_path)
-    if not lines:
-        return GENESIS_HASH
-    last = json.loads(lines[-1])
-    return last["immutable_hash"]
+def _get_last_hash(db: DBSession) -> str:
+    last = db.query(DBAuditLog).order_by(DBAuditLog.id.desc()).first()
+    return last.immutable_hash if last else GENESIS_HASH
 
 
-def _append_line(record: AuditLogRecord, log_path: str) -> None:
-    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(record.model_dump_json() + "\n")
+def read_all_records(session_factory: SessionFactory = SessionLocal) -> list[AuditLogRecord]:
+    """Reads every record currently in the chain, in append (id) order."""
+    db = session_factory()
+    try:
+        rows = db.query(DBAuditLog).order_by(DBAuditLog.id.asc()).all()
+        return [_db_row_to_record(r) for r in rows]
+    finally:
+        db.close()
 
 
+<<<<<<< Updated upstream
 def _append_record_file(
     stage: LogStage, agent: str, session_id: str,
     payload_snapshot: dict, decision_summary: str, path: str,
@@ -174,11 +246,41 @@ def read_all_records(log_path: Optional[str] = None) -> list[AuditLogRecord]:
 
     from agent5_audit_logging.db_storage import db_read_all
     return db_read_all()
+=======
+def read_records_for_session(
+    session_id: str, session_factory: SessionFactory = SessionLocal
+) -> list[AuditLogRecord]:
+    """Convenience filter for "show me this session's audit trail" — NOT
+    used for hash-chain verification, since verify_chain() needs the
+    globally-ordered full chain to correctly recompute prev_hash links."""
+    db = session_factory()
+    try:
+        rows = (
+            db.query(DBAuditLog)
+            .filter(DBAuditLog.session_id == session_id)
+            .order_by(DBAuditLog.id.asc())
+            .all()
+        )
+        return [_db_row_to_record(r) for r in rows]
+    finally:
+        db.close()
+>>>>>>> Stashed changes
 
 
-def verify_chain(log_path: Optional[str] = None) -> tuple[bool, list[dict]]:
+def verify_chain(
+    session_factory: SessionFactory = SessionLocal,
+) -> tuple[bool, list[dict]]:
     """Recomputes each record's hash from its content + the *previous
+<<<<<<< Updated upstream
     record's stored hash* and compares it to what's on disk/in the DB.
+=======
+    record's stored hash* and compares it to what's on disk (now: the
+    `immutable_hash` column). Also checks the stored `prev_hash` column
+    itself against the previous row's actual immutable_hash — this is a
+    real DB-only upgrade over the JSONL version: it catches a row whose
+    prev_hash pointer doesn't match its true predecessor (e.g. rows
+    reordered or a forged row spliced in), not just content tampering.
+>>>>>>> Stashed changes
 
     Deliberately continues the chain using each record's *stored* hash
     (not the recomputed one) even after a mismatch — this isolates
@@ -186,27 +288,44 @@ def verify_chain(log_path: Optional[str] = None) -> tuple[bool, list[dict]]:
     the first tampered one also showing as broken.
 
     Returns (is_intact, broken_records) where broken_records is a list of
+<<<<<<< Updated upstream
     {"index", "log_id", "stage", "expected_hash", "actual_hash"} dicts —
     empty if the chain is fully intact. Backend-agnostic: driven entirely
     by read_all_records(), so it works identically for either backend.
+=======
+    {"index", "log_id", "stage", "expected_hash", "actual_hash",
+    "prev_hash_mismatch"} dicts — empty if the chain is fully intact.
+>>>>>>> Stashed changes
     """
-    records = read_all_records(log_path)
+    db = session_factory()
+    try:
+        rows = db.query(DBAuditLog).order_by(DBAuditLog.id.asc()).all()
+    finally:
+        db.close()
+
     prev_hash = GENESIS_HASH
     broken: list[dict] = []
 
-    for i, rec in enumerate(records):
-        expected = compute_hash(rec, prev_hash)
-        if expected != rec.immutable_hash:
+    for i, row in enumerate(rows):
+        record = _db_row_to_record(row)
+        expected = compute_hash(record, prev_hash)
+
+        content_ok = expected == row.immutable_hash
+        pointer_ok = row.prev_hash == prev_hash
+
+        if not content_ok or not pointer_ok:
             broken.append(
                 {
                     "index": i,
-                    "log_id": rec.log_id,
-                    "stage": rec.stage.value,
+                    "log_id": str(row.log_id),
+                    "stage": row.stage.value,
                     "expected_hash": expected,
-                    "actual_hash": rec.immutable_hash,
+                    "actual_hash": row.immutable_hash,
+                    "prev_hash_mismatch": not pointer_ok,
                 }
             )
-        prev_hash = rec.immutable_hash
+
+        prev_hash = row.immutable_hash
 
     return (len(broken) == 0, broken)
 
@@ -216,8 +335,67 @@ def verify_chain(log_path: Optional[str] = None) -> tuple[bool, list[dict]]:
 # append_record, so these need no backend awareness at all)
 # --------------------------------------------------------------------------
 
+<<<<<<< Updated upstream
+=======
+def append_record(
+    stage: LogStage,
+    agent: str,
+    session_id: str,
+    payload_snapshot: dict,
+    decision_summary: str,
+    session_factory: SessionFactory = SessionLocal,
+) -> AuditLogRecord:
+    """Appends one audit record to the chain and returns it.
+
+    `session_factory` is only for tests / isolated runs — production code
+    should rely on the default (the real SessionLocal) so every stage
+    writes to the same shared chain.
+    """
+    db = session_factory()
+    try:
+        prev_hash = _get_last_hash(db)
+
+        record = AuditLogRecord(
+            log_id=str(uuid4()),
+            session_id=session_id,
+            stage=stage,
+            agent=agent,
+            payload_snapshot=payload_snapshot,
+            decision_summary=decision_summary,
+            timestamp=datetime.now(timezone.utc),
+            immutable_hash="",  # placeholder; _canonical_json excludes it anyway
+        )
+        record.immutable_hash = compute_hash(record, prev_hash)
+
+        db_row = DBAuditLog(
+            log_id=record.log_id,
+            session_id=record.session_id,
+            stage=_to_db_stage(stage),
+            agent=agent,
+            payload_snapshot=payload_snapshot,
+            decision_summary=decision_summary,
+            timestamp=record.timestamp,
+            immutable_hash=record.immutable_hash,
+            prev_hash=prev_hash,
+        )
+        db.add(db_row)
+        db.commit()
+
+        return record
+    finally:
+        db.close()
+
+
+# --------------------------------------------------------------------------
+# Per-agent convenience wrappers
+# --------------------------------------------------------------------------
+# pipeline.py calls these directly after each agent runs — one line per
+# stage instead of hand-building payload_snapshot/decision_summary at
+# every call site.
+
+>>>>>>> Stashed changes
 def log_classification(
-    agent1_output: Agent1Output, log_path: Optional[str] = None
+    agent1_output: Agent1Output, session_factory: SessionFactory = SessionLocal
 ) -> AuditLogRecord:
     decision_summary = (
         f"intent={agent1_output.intent.value} "
@@ -231,12 +409,12 @@ def log_classification(
         session_id=agent1_output.session_id,
         payload_snapshot=agent1_output.model_dump(mode="json"),
         decision_summary=decision_summary,
-        log_path=log_path,
+        session_factory=session_factory,
     )
 
 
 def log_retrieval(
-    agent2_output: Agent2Output, log_path: Optional[str] = None
+    agent2_output: Agent2Output, session_factory: SessionFactory = SessionLocal
 ) -> AuditLogRecord:
     decision_summary = (
         f"results={len(agent2_output.results)} "
@@ -250,12 +428,12 @@ def log_retrieval(
         session_id=agent2_output.session_id,
         payload_snapshot=agent2_output.model_dump(mode="json"),
         decision_summary=decision_summary,
-        log_path=log_path,
+        session_factory=session_factory,
     )
 
 
 def log_generation(
-    agent3_output: Agent3Output, log_path: Optional[str] = None
+    agent3_output: Agent3Output, session_factory: SessionFactory = SessionLocal
 ) -> AuditLogRecord:
     decision_summary = (
         f"grounded={agent3_output.grounded} "
@@ -268,12 +446,12 @@ def log_generation(
         session_id=agent3_output.session_id,
         payload_snapshot=agent3_output.model_dump(mode="json"),
         decision_summary=decision_summary,
-        log_path=log_path,
+        session_factory=session_factory,
     )
 
 
 def log_verification(
-    agent4_output: Agent4Output, log_path: Optional[str] = None
+    agent4_output: Agent4Output, session_factory: SessionFactory = SessionLocal
 ) -> AuditLogRecord:
     decision_summary = (
         f"decision={agent4_output.decision.value} "
@@ -286,51 +464,51 @@ def log_verification(
         session_id=agent4_output.session_id,
         payload_snapshot=agent4_output.model_dump(mode="json"),
         decision_summary=decision_summary,
-        log_path=log_path,
+        session_factory=session_factory,
     )
 
 
 # --------------------------------------------------------------------------
 # Manual smoke test — run with: python -m agent5_audit_logging.logger
+<<<<<<< Updated upstream
 # Always uses the file backend (explicit log_path), regardless of your
 # .env AUDIT_LOG_BACKEND setting, so this stays a safe local sanity check.
 # For a DB-backend smoke test, see tests/test_agent5/test_db_backend.py.
+=======
+#
+# WARNING: this writes real rows to the shared production audit_log
+# table (no session_factory override here — deliberately, to prove the
+# real DB wiring works end to end). It does NOT tamper with or delete
+# anything; it only appends 3 demo rows and verifies the chain.
+>>>>>>> Stashed changes
 # --------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    import tempfile
+    print("Writing 3 demo records to the REAL audit_log table...\n")
 
-    demo_path = os.path.join(tempfile.gettempdir(), "bankkms_audit_demo.jsonl")
-    if os.path.exists(demo_path):
-        os.remove(demo_path)
-
-    print(f"Writing demo audit chain to: {demo_path}\n")
-
-    append_record(
+    r1 = append_record(
         stage=LogStage.CLASSIFICATION,
         agent="agent1_classification",
-        session_id="sess_demo",
+        session_id="sess_demo_logger_smoketest",
         payload_snapshot={"intent": "procedure_lookup", "access_level": "public"},
         decision_summary="classified as procedure_lookup, access_level=public",
-        log_path=demo_path,
     )
-    append_record(
+    r2 = append_record(
         stage=LogStage.RETRIEVAL,
         agent="agent2_retrieval",
-        session_id="sess_demo",
+        session_id="sess_demo_logger_smoketest",
         payload_snapshot={"results": 5, "retrieval_confidence": "medium"},
         decision_summary="retrieved 5 chunks at medium confidence",
-        log_path=demo_path,
     )
-    append_record(
+    r3 = append_record(
         stage=LogStage.VERIFICATION,
         agent="agent4_verification",
-        session_id="sess_demo",
+        session_id="sess_demo_logger_smoketest",
         payload_snapshot={"decision": "approved", "confidence": 0.95},
         decision_summary="decision=approved confidence=0.95",
-        log_path=demo_path,
     )
 
+<<<<<<< Updated upstream
     ok, broken = verify_chain(demo_path)
     print(f"Chain intact: {ok}")
     print(f"Records: {len(read_all_records(demo_path))}\n")
@@ -349,3 +527,11 @@ if __name__ == "__main__":
         print(f"Tampering detected at: {broken2}")
 
     os.remove(demo_path)
+=======
+    ok, broken = verify_chain()
+    print(f"Chain intact (whole table): {ok}")
+    print(f"Total records in table: {len(read_all_records())}")
+    print(f"This session's records: {len(read_records_for_session('sess_demo_logger_smoketest'))}")
+    if not ok:
+        print(f"Broken entries: {broken}")
+>>>>>>> Stashed changes
