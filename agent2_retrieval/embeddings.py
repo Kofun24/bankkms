@@ -44,7 +44,7 @@ class TfidfEmbedder:
             max_features=4096,
         )
         self._fitted = False
-        self._path = Path(config.VECTOR_DB_PATH) / "tfidf_vectorizer.pkl"
+        self._path = Path("./agent2_retrieval/_tfidf_cache") / "tfidf_vectorizer.pkl"
 
     def fit(self, texts: list[str]) -> None:
         self._vectorizer.fit(texts)

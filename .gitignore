@@ -4,4 +4,5 @@ __pycache__/
 .venv/
 venv/
 knowledge_base/vector_index/
-.DS_Store
+.DS_Storefrontend/node_modules/
+frontend/dist/

@@ -5,12 +5,14 @@ class UserRole(str, Enum):
     CUSTOMER = "customer"
     EMPLOYEE = "employee"
     COMPLIANCE = "compliance"
+    ADMIN = "admin"
 
 
 class AccessLevel(str, Enum):
     PUBLIC = "public"
     INTERNAL = "internal"
     RESTRICTED = "restricted"
+    NONE = "none"
 
 
 class Intent(str, Enum):
@@ -70,10 +72,15 @@ ROLE_ACCESS_MAP = {
     UserRole.CUSTOMER: AccessLevel.PUBLIC,
     UserRole.EMPLOYEE: AccessLevel.INTERNAL,
     UserRole.COMPLIANCE: AccessLevel.RESTRICTED,
+    UserRole.ADMIN: AccessLevel.NONE,
 }
 
 # Hierarchy used by Agent 2 / Agent 4 to decide which doc access levels
-# a given session access_level is permitted to see (higher role sees lower tiers too).
+# a given session access_level is permitted to see. NONE (Admin) intentionally
+# has no rank — Admin has zero query access and is blocked at Agent 1's
+# require_query_access() before ever reaching Agent 2. Calling this with
+# NONE means that guard failed upstream, so it raises loudly rather than
+# silently returning an empty or wrong list.
 ACCESS_LEVEL_RANK = {
     AccessLevel.PUBLIC: 1,
     AccessLevel.INTERNAL: 2,
@@ -83,5 +90,10 @@ ACCESS_LEVEL_RANK = {
 
 def allowed_access_levels(access_level: AccessLevel) -> list[AccessLevel]:
     """All doc access levels a session with `access_level` is permitted to retrieve."""
+    if access_level not in ACCESS_LEVEL_RANK:
+        raise ValueError(
+            f"access_level={access_level!r} has no defined retrieval rank "
+            "(Admin/NONE sessions must never reach Agent 2)."
+        )
     max_rank = ACCESS_LEVEL_RANK[access_level]
     return [lvl for lvl, rank in ACCESS_LEVEL_RANK.items() if rank <= max_rank]
