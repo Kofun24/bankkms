@@ -11,6 +11,10 @@ CONFIDENCE_THRESHOLD (0.6) -- so an "approved" outcome in these tests
 always requires the `fake_gemini` fixture to simulate a real LLM
 verdict with confidence >= threshold. Tests that don't care about
 factual confidence use the fallback as-is.
+
+These do NOT exercise the real database-backed version_lookup (that
+needs a live DB) -- run_live_query.py at the project root is the real
+end-to-end proof against actual data.
 """
 
 import json

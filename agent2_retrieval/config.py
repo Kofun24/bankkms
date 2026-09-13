@@ -22,9 +22,6 @@ LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-2.0-flash")
 CONFIDENCE_THRESHOLD: float = float(os.getenv("CONFIDENCE_THRESHOLD", "0.6"))
 HIGH_CONFIDENCE_MARGIN: float = float(os.getenv("HIGH_CONFIDENCE_MARGIN", "0.2"))
 
-# --- Vector store ---
-VECTOR_DB_PATH: str = os.getenv("VECTOR_DB_PATH", "./knowledge_base/vector_index")
-COLLECTION_NAME: str = os.getenv("VECTOR_DB_COLLECTION", "bankkms_docs")
 
 # --- Knowledge base source documents ---
 KNOWLEDGE_BASE_DIR: str = os.getenv("KNOWLEDGE_BASE_DIR", "./knowledge_base")
@@ -41,4 +38,3 @@ EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 MAX_RETRIEVAL_ATTEMPTS: int = int(os.getenv("MAX_RETRIEVAL_ATTEMPTS", "2"))
 TOP_K: int = int(os.getenv("RETRIEVAL_TOP_K", "5"))
 
-Path(VECTOR_DB_PATH).mkdir(parents=True, exist_ok=True)
