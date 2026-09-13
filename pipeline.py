@@ -2,12 +2,11 @@
 pipeline.py
 
 Top-level orchestration for the BankKMS pipeline. Wires agents together in
-sequence: Agent 1 -> Agent 2 -> Agent 3 -> Agent 4 (-> Agent 5/6 as hooks).
+sequence: Agent 1 -> Agent 2 -> Agent 3 -> Agent 4 -> Agent 5 (audit log).
 
-All four core agents are now wired. Agent 5 (audit logging) and Agent 6
-(escalation handoff) remain TODOs — hook them in where marked once they're
-ready, ideally right after Agent 4 returns (log every decision; route to
-Agent 6 specifically when decision == "escalated").
+All four core agents plus Agent 5 (audit logging) are wired. Agent 6
+(escalation handoff) remains a TODO — hook it in where marked once it's
+ready, routing to human review whenever agent4_output.decision == "escalated".
 """
 
 from agent1_classification.auth import (
@@ -21,6 +20,12 @@ from agent2_retrieval.retriever import Agent2Retriever
 from agent3_response.responder import analyze_and_respond
 from agent4_verification.db_integration import version_lookup_from_db
 from agent4_verification.verifier import run_agent4
+from agent5_audit_logging.logger import (
+    log_classification,
+    log_generation,
+    log_retrieval,
+    log_verification,
+)
 from shared.enums import UserRole
 from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output
 
@@ -72,11 +77,15 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
         version_lookup=version_lookup_from_db,
     )
 
-    # TODO (Agent 5 owner): log this decision to the audit_log table here,
-    # e.g. log_decision(stage="verification", agent="Agent 4",
-    # payload_snapshot=agent4_output.model_dump(), ...). Ideally log every
-    # stage (classification, retrieval, generation, verification), not
-    # just the final one — see database/models.py AuditLog.stage enum.
+    # Every stage gets logged independently, not just the final decision —
+    # so a compromised/buggy earlier agent can't also hide its own tracks
+    # by the pipeline skipping a log entry on its behalf.
+    audit_records = [
+        log_classification(agent1_output),
+        log_retrieval(agent2_output),
+        log_generation(agent3_output),
+        log_verification(agent4_output),
+    ]
 
     # TODO (Agent 6 owner): when agent4_output.decision == "escalated",
     # route to human review here instead of just returning the status.
@@ -103,6 +112,7 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
         "agent2_output": agent2_output,
         "agent3_output": agent3_output,
         "agent4_output": agent4_output,
+        "agent5_records": audit_records,
         "status": status,
         "message_to_user": message_to_user,
         "final_response": {
@@ -176,5 +186,14 @@ if __name__ == "__main__":
                 print(f"  source: {c.doc_title} ({c.section})")
         else:
             print(f"\nFINAL ANSWER: [withheld — {a4.decision.value}]")
+
+    if "agent5_records" in result:
+        print("\n--- Agent 5 Output (audit log) ---")
+        for rec in result["agent5_records"]:
+            print(f"[{rec.stage.value}] log_id={rec.log_id}")
+            print(f"    agent:      {rec.agent}")
+            print(f"    summary:    {rec.decision_summary}")
+            print(f"    hash:       {rec.immutable_hash}")
+            print(f"    timestamp:  {rec.timestamp}")
 
     print("------------------------\n")
