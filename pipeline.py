@@ -2,12 +2,11 @@
 pipeline.py
 
 Top-level orchestration for the BankKMS pipeline. Wires agents together in
-sequence: Agent 1 -> Agent 2 -> Agent 3 -> Agent 4 (-> Agent 5/6 as hooks).
+sequence: Agent 1 -> Agent 2 -> Agent 3 -> Agent 4 -> Agent 5 (audit log).
 
-All four core agents are now wired. Agent 5 (audit logging) and Agent 6
-(escalation handoff) remain TODOs — hook them in where marked once they're
-ready, ideally right after Agent 4 returns (log every decision; route to
-Agent 6 specifically when decision == "escalated").
+All four core agents plus Agent 5 (audit logging) are wired. Agent 6
+(escalation handoff) remains a TODO — hook it in where marked once it's
+ready, routing to human review whenever agent4_output.decision == "escalated".
 """
 
 from agent1_classification.auth import (
@@ -21,6 +20,12 @@ from agent2_retrieval.retriever import Agent2Retriever
 from agent3_response.responder import analyze_and_respond
 from agent4_verification.db_integration import version_lookup_from_db
 from agent4_verification.verifier import run_agent4
+from agent5_audit_logging.logger import (
+    log_classification,
+    log_generation,
+    log_retrieval,
+    log_verification,
+)
 from shared.enums import UserRole
 from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output
 
@@ -28,6 +33,64 @@ from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Outpu
 # every query would be wasteful. Requires `python -m agent2_retrieval.ingest`
 # to have been run at least once so the index exists on disk.
 _agent2 = Agent2Retriever()
+
+
+# Maps the machine-readable reason prefixes verifier.py's decide() produces
+# (e.g. "access_violation: ...", "low_retrieval_confidence: ...") to an
+# actual user-facing sentence. Matched by prefix so the doc_ids / conflict
+# details verifier.py appends after the colon don't break the lookup.
+# A reason that doesn't match anything here (shouldn't normally happen,
+# but keeps this forward-compatible if decide() ever adds a new branch)
+# falls back to a safe generic message rather than crashing.
+_REASON_MESSAGES: dict[str, str] = {
+    "access_violation": (
+        "I can't share that information — it's outside what your account "
+        "is authorized to access."
+    ),
+    "insufficient_evidence": (
+        "I don't have reliable information in the knowledge base to "
+        "answer that confidently."
+    ),
+    "factual_check_failed": (
+        "I found some related information, but couldn't fully confirm its "
+        "accuracy, so this has been flagged for review before I can answer "
+        "confidently."
+    ),
+    "version_conflict": (
+        "There appear to be multiple versions of this policy on record. "
+        "This needs a quick review so you get the current, correct answer."
+    ),
+    "low_retrieval_confidence": (
+        "I couldn't find a strong match for your question in the knowledge "
+        "base, so this has been flagged for review."
+    ),
+    "low_confidence": (
+        "I'm not confident enough in this answer yet, so it's been flagged "
+        "for a closer look before I respond."
+    ),
+}
+
+_DENIED_FALLBACK = (
+    "I can't provide that information — it may be outside what you're "
+    "authorized to access, or I don't have reliable information to answer "
+    "confidently."
+)
+_ESCALATED_FALLBACK = (
+    "This needs a closer look before I can answer confidently. It's been "
+    "flagged for review."
+)
+
+
+def _message_for_reason(reason: str | None, denied: bool) -> str:
+    """Turns verifier.py's internal reason string into the sentence the
+    user actually sees. Matches by prefix (reason strings look like
+    'access_violation: cited document(s) exceed...') so appended details
+    (doc_ids, conflict specifics) don't break the lookup."""
+    if reason:
+        prefix = reason.split(":", 1)[0].strip()
+        if prefix in _REASON_MESSAGES:
+            return _REASON_MESSAGES[prefix]
+    return _DENIED_FALLBACK if denied else _ESCALATED_FALLBACK
 
 
 def run_pipeline(session_id: str, raw_query: str) -> dict:
@@ -72,11 +135,15 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
         version_lookup=version_lookup_from_db,
     )
 
-    # TODO (Agent 5 owner): log this decision to the audit_log table here,
-    # e.g. log_decision(stage="verification", agent="Agent 4",
-    # payload_snapshot=agent4_output.model_dump(), ...). Ideally log every
-    # stage (classification, retrieval, generation, verification), not
-    # just the final one — see database/models.py AuditLog.stage enum.
+    # Every stage gets logged independently, not just the final decision —
+    # so a compromised/buggy earlier agent can't also hide its own tracks
+    # by the pipeline skipping a log entry on its behalf.
+    audit_records = [
+        log_classification(agent1_output),
+        log_retrieval(agent2_output),
+        log_generation(agent3_output),
+        log_verification(agent4_output),
+    ]
 
     # TODO (Agent 6 owner): when agent4_output.decision == "escalated",
     # route to human review here instead of just returning the status.
@@ -86,23 +153,17 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
         message_to_user = agent4_output.final_answer
     elif agent4_output.decision.value == "denied":
         status = "denied"
-        message_to_user = (
-            "I can't provide that information — it may be outside what "
-            "you're authorized to access, or I don't have reliable "
-            "information to answer confidently."
-        )
+        message_to_user = _message_for_reason(agent4_output.denial_reason, denied=True)
     else:  # escalated
         status = "escalated"
-        message_to_user = (
-            "This needs a closer look before I can answer confidently. "
-            "It's been flagged for review."
-        )
+        message_to_user = _message_for_reason(agent4_output.denial_reason, denied=False)
 
     return {
         "agent1_output": agent1_output,
         "agent2_output": agent2_output,
         "agent3_output": agent3_output,
         "agent4_output": agent4_output,
+        "agent5_records": audit_records,
         "status": status,
         "message_to_user": message_to_user,
         "final_response": {
@@ -176,5 +237,14 @@ if __name__ == "__main__":
                 print(f"  source: {c.doc_title} ({c.section})")
         else:
             print(f"\nFINAL ANSWER: [withheld — {a4.decision.value}]")
+
+    if "agent5_records" in result:
+        print("\n--- Agent 5 Output (audit log) ---")
+        for rec in result["agent5_records"]:
+            print(f"[{rec.stage.value}] log_id={rec.log_id}")
+            print(f"    agent:      {rec.agent}")
+            print(f"    summary:    {rec.decision_summary}")
+            print(f"    hash:       {rec.immutable_hash}")
+            print(f"    timestamp:  {rec.timestamp}")
 
     print("------------------------\n")
