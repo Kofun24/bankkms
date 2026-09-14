@@ -61,7 +61,8 @@ def test_factual_fail_escalates_not_denies():
         retrieval_confidence_low=False,
     )
     assert decision == VerificationDecision.ESCALATED
-    assert reason is None
+    assert reason is not None
+    assert "factual_check_failed" in reason
 
 
 def test_version_conflict_escalates_even_with_good_factual_check():
@@ -74,6 +75,7 @@ def test_version_conflict_escalates_even_with_good_factual_check():
         retrieval_confidence_low=False,
     )
     assert decision == VerificationDecision.ESCALATED
+    assert "version_conflict" in reason
 
 
 def test_low_retrieval_confidence_escalates():
@@ -86,6 +88,7 @@ def test_low_retrieval_confidence_escalates():
         retrieval_confidence_low=True,
     )
     assert decision == VerificationDecision.ESCALATED
+    assert "low_retrieval_confidence" in reason
 
 
 def test_confidence_below_threshold_escalates():
@@ -98,6 +101,7 @@ def test_confidence_below_threshold_escalates():
         retrieval_confidence_low=False,
     )
     assert decision == VerificationDecision.ESCALATED
+    assert "low_confidence" in reason
 
 
 def test_confidence_at_exact_threshold_is_approved():

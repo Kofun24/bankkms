@@ -454,7 +454,15 @@ def decide(
     retrieval_confidence_low: bool,
 ) -> tuple[VerificationDecision, Optional[str]]:
     """A security violation must NEVER be softened into an escalation —
-    that's why access_ok is checked first and returns DENIED unconditionally."""
+    that's why access_ok is checked first and returns DENIED unconditionally.
+
+    Every branch now returns a specific machine-readable reason string
+    (not just the DENIED ones) — this is what lets callers like
+    pipeline.py show a different, accurate message to the user for each
+    distinct failure, instead of one generic sentence per decision type.
+    The reason field on Agent4Output is still called `denial_reason` for
+    backward compatibility, but it's populated for any non-approved
+    decision, denied or escalated."""
     evidence_value = _enum_value(evidence)
     factual_value = _enum_value(factual)
 
@@ -471,16 +479,28 @@ def decide(
         )
 
     if factual_value == FactualSupportCheck.FAIL.value:
-        return VerificationDecision.ESCALATED, None
+        return (
+            VerificationDecision.ESCALATED,
+            "factual_check_failed: the answer could not be fully verified against its cited sources",
+        )
 
     if version_conflict:
-        return VerificationDecision.ESCALATED, None
+        return (
+            VerificationDecision.ESCALATED,
+            "version_conflict: multiple versions of a cited document exist and require review",
+        )
 
     if retrieval_confidence_low:
-        return VerificationDecision.ESCALATED, None
+        return (
+            VerificationDecision.ESCALATED,
+            "low_retrieval_confidence: the retrieved evidence was a weak match for this question",
+        )
 
     if factual_confidence < CONFIDENCE_THRESHOLD:
-        return VerificationDecision.ESCALATED, None
+        return (
+            VerificationDecision.ESCALATED,
+            "low_confidence: verification confidence did not meet the required threshold",
+        )
 
     return VerificationDecision.APPROVED, None
 
@@ -581,7 +601,7 @@ def run_agent4(
     return Agent4Output(
         session_id=session_id,
         decision=decision,
-        denial_reason=denial_reason if decision == VerificationDecision.DENIED else None,
+        denial_reason=denial_reason if decision != VerificationDecision.APPROVED else None,
         evidence_sufficiency=evidence,
         factual_support_check=factual,
         version_conflict_detected=conflict_detected,

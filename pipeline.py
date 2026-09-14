@@ -35,6 +35,64 @@ from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Outpu
 _agent2 = Agent2Retriever()
 
 
+# Maps the machine-readable reason prefixes verifier.py's decide() produces
+# (e.g. "access_violation: ...", "low_retrieval_confidence: ...") to an
+# actual user-facing sentence. Matched by prefix so the doc_ids / conflict
+# details verifier.py appends after the colon don't break the lookup.
+# A reason that doesn't match anything here (shouldn't normally happen,
+# but keeps this forward-compatible if decide() ever adds a new branch)
+# falls back to a safe generic message rather than crashing.
+_REASON_MESSAGES: dict[str, str] = {
+    "access_violation": (
+        "I can't share that information — it's outside what your account "
+        "is authorized to access."
+    ),
+    "insufficient_evidence": (
+        "I don't have reliable information in the knowledge base to "
+        "answer that confidently."
+    ),
+    "factual_check_failed": (
+        "I found some related information, but couldn't fully confirm its "
+        "accuracy, so this has been flagged for review before I can answer "
+        "confidently."
+    ),
+    "version_conflict": (
+        "There appear to be multiple versions of this policy on record. "
+        "This needs a quick review so you get the current, correct answer."
+    ),
+    "low_retrieval_confidence": (
+        "I couldn't find a strong match for your question in the knowledge "
+        "base, so this has been flagged for review."
+    ),
+    "low_confidence": (
+        "I'm not confident enough in this answer yet, so it's been flagged "
+        "for a closer look before I respond."
+    ),
+}
+
+_DENIED_FALLBACK = (
+    "I can't provide that information — it may be outside what you're "
+    "authorized to access, or I don't have reliable information to answer "
+    "confidently."
+)
+_ESCALATED_FALLBACK = (
+    "This needs a closer look before I can answer confidently. It's been "
+    "flagged for review."
+)
+
+
+def _message_for_reason(reason: str | None, denied: bool) -> str:
+    """Turns verifier.py's internal reason string into the sentence the
+    user actually sees. Matches by prefix (reason strings look like
+    'access_violation: cited document(s) exceed...') so appended details
+    (doc_ids, conflict specifics) don't break the lookup."""
+    if reason:
+        prefix = reason.split(":", 1)[0].strip()
+        if prefix in _REASON_MESSAGES:
+            return _REASON_MESSAGES[prefix]
+    return _DENIED_FALLBACK if denied else _ESCALATED_FALLBACK
+
+
 def run_pipeline(session_id: str, raw_query: str) -> dict:
     """
     Runs the full BankKMS pipeline for a single user query.
@@ -95,17 +153,10 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
         message_to_user = agent4_output.final_answer
     elif agent4_output.decision.value == "denied":
         status = "denied"
-        message_to_user = (
-            "I can't provide that information — it may be outside what "
-            "you're authorized to access, or I don't have reliable "
-            "information to answer confidently."
-        )
+        message_to_user = _message_for_reason(agent4_output.denial_reason, denied=True)
     else:  # escalated
         status = "escalated"
-        message_to_user = (
-            "This needs a closer look before I can answer confidently. "
-            "It's been flagged for review."
-        )
+        message_to_user = _message_for_reason(agent4_output.denial_reason, denied=False)
 
     return {
         "agent1_output": agent1_output,
