@@ -17,17 +17,22 @@ from sqlalchemy import text
 from agent1_classification.admin_operations import (
     DocumentNotFoundError,
     EmployeeNotFoundError,
+    LastAdminError,
     admin_add_document,
     admin_add_employee,
     admin_deactivate_employee,
     admin_list_documents,
     admin_list_employees,
     admin_promote_to_admin,
+    admin_demote_from_admin,
     admin_reactivate_employee,
     admin_retire_document,
+    admin_change_role,
+    
 )
 from agent1_classification.auth import UnauthorizedRoleError, create_user, login
 from database.config import SessionLocal
+from database.models import User, UserRole as DBUserRole
 from shared.enums import AccessLevel, UserRole
 
 
@@ -98,6 +103,150 @@ def test_admin_can_add_compliance_officer():
     ctx = login(new_username, "password123")
     assert ctx.user_role == UserRole.COMPLIANCE
 
+def test_admin_can_change_employee_to_compliance():
+    admin_session = make_admin_session()
+    target_username = make_test_username("lateral")
+    create_user(target_username, "password123", UserRole.EMPLOYEE)
+
+    admin_change_role(admin_session, target_username, UserRole.COMPLIANCE)
+
+    ctx = login(target_username, "password123")
+    assert ctx.user_role == UserRole.COMPLIANCE
+
+
+def test_admin_can_change_compliance_to_employee():
+    admin_session = make_admin_session()
+    target_username = make_test_username("lateral2")
+    create_user(target_username, "password123", UserRole.COMPLIANCE)
+
+    admin_change_role(admin_session, target_username, UserRole.EMPLOYEE)
+
+    ctx = login(target_username, "password123")
+    assert ctx.user_role == UserRole.EMPLOYEE
+
+
+def test_change_role_rejects_customer_target():
+    admin_session = make_admin_session()
+    target_username = make_test_username("nocustomer")
+    create_user(target_username, "password123", UserRole.EMPLOYEE)
+
+    with pytest.raises(UnauthorizedRoleError):
+        admin_change_role(admin_session, target_username, UserRole.CUSTOMER)
+
+
+def test_change_role_rejects_same_role():
+    admin_session = make_admin_session()
+    target_username = make_test_username("samerole")
+    create_user(target_username, "password123", UserRole.EMPLOYEE)
+
+    with pytest.raises(ValueError):
+        admin_change_role(admin_session, target_username, UserRole.EMPLOYEE)
+
+
+def test_non_admin_cannot_change_role():
+    employee_session = make_employee_session()
+    target_username = make_test_username("blocked2")
+    create_user(target_username, "password123", UserRole.EMPLOYEE)
+
+    with pytest.raises(UnauthorizedRoleError):
+        admin_change_role(employee_session, target_username, UserRole.COMPLIANCE)
+
+def test_cannot_change_role_of_last_admin():
+    admin_username = make_test_username("onlyadmin")
+    create_user(admin_username, "adminpass123", UserRole.ADMIN)
+    admin_session = login(admin_username, "adminpass123").session_id
+
+    # Temporarily deactivate every OTHER admin so this test's admin is
+    # genuinely the last active one — necessary because we're testing
+    # against the real shared database, which always has demo_admin
+    # and possibly other admins already active.
+    db = SessionLocal()
+    try:
+        other_admins = (
+            db.query(User)
+            .filter(User.role == DBUserRole.ADMIN, User.username != admin_username, User.is_active == True)  # noqa: E712
+            .all()
+        )
+        other_admin_ids = [a.id for a in other_admins]
+        for a in other_admins:
+            a.is_active = False
+        db.commit()
+    finally:
+        db.close()
+
+    try:
+        with pytest.raises(LastAdminError):
+            admin_change_role(admin_session, admin_username, UserRole.EMPLOYEE)
+    finally:
+        # Always restore the other admins' active status, even if the
+        # assertion above fails, so we don't leave demo_admin locked out.
+        db = SessionLocal()
+        try:
+            db.query(User).filter(User.id.in_(other_admin_ids)).update(
+                {"is_active": True}, synchronize_session=False
+            )
+            db.commit()
+        finally:
+            db.close()
+
+def test_can_change_role_when_multiple_admins_exist():
+    admin1_username = make_test_username("admin1")
+    admin2_username = make_test_username("admin2")
+    create_user(admin1_username, "password123", UserRole.ADMIN)
+    create_user(admin2_username, "password123", UserRole.ADMIN)
+    admin1_session = login(admin1_username, "password123").session_id
+
+    # demoting admin2 is fine, since admin1 remains
+    admin_change_role(admin1_session, admin2_username, UserRole.EMPLOYEE)
+
+    ctx = login(admin2_username, "password123")
+    assert ctx.user_role == UserRole.EMPLOYEE
+
+
+def test_cannot_deactivate_last_admin():
+    admin_username = make_test_username("lastadmindeact")
+    create_user(admin_username, "adminpass123", UserRole.ADMIN)
+    admin_session = login(admin_username, "adminpass123").session_id
+
+    db = SessionLocal()
+    try:
+        other_admins = (
+            db.query(User)
+            .filter(User.role == DBUserRole.ADMIN, User.username != admin_username, User.is_active == True)  # noqa: E712
+            .all()
+        )
+        other_admin_ids = [a.id for a in other_admins]
+        for a in other_admins:
+            a.is_active = False
+        db.commit()
+    finally:
+        db.close()
+
+    try:
+        with pytest.raises(LastAdminError):
+            admin_deactivate_employee(admin_session, admin_username)
+    finally:
+        db = SessionLocal()
+        try:
+            db.query(User).filter(User.id.in_(other_admin_ids)).update(
+                {"is_active": True}, synchronize_session=False
+            )
+            db.commit()
+        finally:
+            db.close()
+
+def test_can_deactivate_admin_when_multiple_exist():
+    admin1_username = make_test_username("multiadmin1")
+    admin2_username = make_test_username("multiadmin2")
+    create_user(admin1_username, "password123", UserRole.ADMIN)
+    create_user(admin2_username, "password123", UserRole.ADMIN)
+    admin1_session = login(admin1_username, "password123").session_id
+
+    admin_deactivate_employee(admin1_session, admin2_username)  # fine, admin1 remains active
+
+    from agent1_classification.auth import InvalidCredentialsError
+    with pytest.raises(InvalidCredentialsError):
+        login(admin2_username, "password123")
 
 def test_admin_add_employee_rejects_admin_role():
     """admin_add_employee should not be usable to create another Admin —
@@ -129,6 +278,35 @@ def test_admin_can_promote_employee_to_admin():
     ctx = login(target_username, "password123")
     assert ctx.user_role == UserRole.ADMIN
 
+def test_admin_can_demote_from_admin():
+    admin_session = make_admin_session()
+    target_username = make_test_username("demote")
+    create_user(target_username, "password123", UserRole.EMPLOYEE)
+
+    admin_promote_to_admin(admin_session, target_username)
+    admin_demote_from_admin(admin_session, target_username, UserRole.EMPLOYEE)
+
+    ctx = login(target_username, "password123")
+    assert ctx.user_role == UserRole.EMPLOYEE
+
+
+def test_demote_rejects_non_admin_role_target():
+    admin_session = make_admin_session()
+    target_username = make_test_username("baddemote")
+    create_user(target_username, "password123", UserRole.EMPLOYEE)
+    admin_promote_to_admin(admin_session, target_username)
+
+    with pytest.raises(UnauthorizedRoleError):
+        admin_demote_from_admin(admin_session, target_username, UserRole.ADMIN)
+
+
+def test_demote_rejects_already_non_admin_user():
+    admin_session = make_admin_session()
+    target_username = make_test_username("notadminyet")
+    create_user(target_username, "password123", UserRole.EMPLOYEE)
+
+    with pytest.raises(ValueError):
+        admin_demote_from_admin(admin_session, target_username, UserRole.EMPLOYEE)
 
 def test_promote_nonexistent_user_raises():
     admin_session = make_admin_session()
