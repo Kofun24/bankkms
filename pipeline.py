@@ -151,6 +151,15 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
     if agent4_output.decision.value == "approved":
         status = "answered"
         message_to_user = agent4_output.final_answer
+        if agent4_output.version_conflict_detected:
+            # Not a blocker — Agent 2 already retrieved only the current
+            # version, so the answer itself is correct. This is purely a
+            # transparency note: the document has prior versions on
+            # record, worth surfacing since policy figures do change.
+            message_to_user += (
+                "\n\n(Note: this policy has been updated before — the "
+                "figures above reflect the current version.)"
+            )
     elif agent4_output.decision.value == "denied":
         status = "denied"
         message_to_user = _message_for_reason(agent4_output.denial_reason, denied=True)

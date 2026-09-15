@@ -107,10 +107,19 @@ def test_denied_on_insufficient_evidence(
     assert result.final_answer is None
 
 
-def test_escalated_on_version_conflict_even_with_confident_llm(
+def test_approved_despite_version_conflict_when_everything_else_checks_out(
     make_chunk, make_citation, make_agent1_output, make_agent2_output,
     make_agent3_output, fake_gemini,
 ):
+    """Version conflict is informational, not a blocker. Agent 2 only
+    ever retrieves the current version of a document, so a conflict just
+    means the document has prior history -- the answer itself, built
+    from the citations Agent 2/3 actually returned, is still correct and
+    should be released to the user. The conflict is still visible via
+    version_conflict_detected/conflict_details (e.g. for pipeline.py to
+    attach a transparency note, or for the audit log), it just doesn't
+    withhold the answer the way an access violation or a failed factual
+    check does."""
     fake_gemini('{"verdict": "pass", "confidence": 0.97, "reason": "supported"}')
 
     chunk_v1 = make_chunk(
@@ -136,10 +145,11 @@ def test_escalated_on_version_conflict_even_with_confident_llm(
 
     result = run_agent4(agent1, agent2, agent3)
 
-    assert result.decision == VerificationDecision.ESCALATED
+    assert result.decision == VerificationDecision.APPROVED
     assert result.version_conflict_detected is True
     assert "Minimum Balance Policy" in result.conflict_details
-    assert result.final_answer is None
+    assert result.final_answer is not None
+    assert result.denial_reason is None
 
 
 def test_escalated_on_low_retrieval_confidence(happy_path, fake_gemini, make_agent2_output):

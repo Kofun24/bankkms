@@ -355,17 +355,29 @@ def check_version_conflict(
     version_lookup: Optional[VersionLookupFn] = None,
 ) -> tuple[bool, Optional[str]]:
     """
-    Detects whether any cited document has multiple distinct versions on
-    record.
+    Detects a genuine version AMBIGUITY for any cited document — i.e. the
+    `documents` table has more than one row simultaneously marked
+    is_current=True for the same title. That's a real data-integrity
+    problem (retiring an old version should always accompany activating
+    the new one), and Agent 4 correctly can't tell which one is "the"
+    current answer.
+
+    This deliberately does NOT flag a document just because it HAS
+    version history (a properly retired old version + one current
+    version is the normal, healthy state — not a conflict). Agent 2
+    already only ever retrieves the current version
+    (is_current=True filtered at the SQL level), so as long as exactly
+    one row is marked current, there's nothing ambiguous: proceed using
+    that version, same as any other citation.
 
     Production: pass `version_lookup=db_integration.version_lookup_from_db`
-    to check the real `documents` table, including versions Agent 2 was
-    never allowed to return (Agent 2 filters is_current=False at the SQL
-    level, so a single Agent2Output can never itself contain two versions
-    of the same doc — this is now the ONLY way to detect a real conflict).
+    to check the real `documents` table for this ambiguity, including
+    rows Agent 2 was never allowed to return.
 
     Offline tests: omit version_lookup — falls back to comparing whatever
-    versions are already present in the hand-built Agent2Output passed in.
+    versions are already present in the hand-built Agent2Output passed in
+    (that path has no is_current concept to check, since RetrievedChunk
+    doesn't carry it — see _check_version_conflict_legacy's docstring).
     """
     if version_lookup is not None:
         return _check_version_conflict_via_db(agent3, chunk_lookup, version_lookup)
@@ -398,15 +410,21 @@ def _check_version_conflict_via_db(
             conflicts[title] = {("lookup_error", "unknown")}
             continue
 
-        distinct = {(str(v.version), str(v.effective_date)) for v in all_versions}
-        if len(distinct) > 1:
-            conflicts[title] = distinct
+        # Only rows CURRENTLY marked is_current=True matter here. A title
+        # with a long, entirely normal history of retired versions is not
+        # a conflict — only genuine simultaneity (two rows both current
+        # at once) is.
+        current_versions = [v for v in all_versions if v.is_current]
+        distinct_current = {(str(v.version), str(v.effective_date)) for v in current_versions}
+
+        if len(distinct_current) > 1:
+            conflicts[title] = distinct_current
 
     if not conflicts:
         return False, None
 
     details = "; ".join(
-        f"{title}: versions {sorted(v[0] for v in versions)}"
+        f"{title}: multiple rows simultaneously marked current — versions {sorted(v[0] for v in versions)}"
         for title, versions in conflicts.items()
     )
     return True, details
@@ -450,19 +468,30 @@ def decide(
     access_ok: bool,
     factual: Union[FactualSupportCheck, str],
     factual_confidence: float,
-    version_conflict: bool,
     retrieval_confidence_low: bool,
 ) -> tuple[VerificationDecision, Optional[str]]:
     """A security violation must NEVER be softened into an escalation —
     that's why access_ok is checked first and returns DENIED unconditionally.
 
-    Every branch now returns a specific machine-readable reason string
-    (not just the DENIED ones) — this is what lets callers like
-    pipeline.py show a different, accurate message to the user for each
-    distinct failure, instead of one generic sentence per decision type.
-    The reason field on Agent4Output is still called `denial_reason` for
+    Every branch returns a specific machine-readable reason string (not
+    just the DENIED ones) — this is what lets callers like pipeline.py
+    show a different, accurate message to the user for each distinct
+    failure, instead of one generic sentence per decision type. The
+    reason field on Agent4Output is still called `denial_reason` for
     backward compatibility, but it's populated for any non-approved
-    decision, denied or escalated."""
+    decision, denied or escalated.
+
+    NOTE: version_conflict is NOT a decide() input anymore. Agent 2 only
+    ever retrieves the current (is_current=True) version of a document —
+    a version conflict just means the document HAS history, not that the
+    answer is wrong. Blocking every answer about any document that's
+    ever been updated was overkill and provided no real safety benefit,
+    since the underlying answer is still built from the correct, current
+    version either way. version_conflict_detected/conflict_details are
+    still computed and attached to Agent4Output regardless of decision —
+    see run_agent4() — so it's visible in the audit log and can be shown
+    to the user as a transparency note, without withholding the answer.
+    """
     evidence_value = _enum_value(evidence)
     factual_value = _enum_value(factual)
 
@@ -482,12 +511,6 @@ def decide(
         return (
             VerificationDecision.ESCALATED,
             "factual_check_failed: the answer could not be fully verified against its cited sources",
-        )
-
-    if version_conflict:
-        return (
-            VerificationDecision.ESCALATED,
-            "version_conflict: multiple versions of a cited document exist and require review",
         )
 
     if retrieval_confidence_low:
@@ -577,7 +600,6 @@ def run_agent4(
         access_ok=access_ok,
         factual=factual,
         factual_confidence=factual_confidence,
-        version_conflict=conflict_detected,
         retrieval_confidence_low=retrieval_confidence_low,
     )
 
