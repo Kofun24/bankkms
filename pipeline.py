@@ -7,6 +7,11 @@ sequence: Agent 1 -> Agent 2 -> Agent 3 -> Agent 4 -> Agent 5 (audit log).
 All four core agents plus Agent 5 (audit logging) are wired. Agent 6
 (escalation handoff) remains a TODO — hook it in where marked once it's
 ready, routing to human review whenever agent4_output.decision == "escalated".
+sequence: Agent 1 -> Agent 2 -> Agent 3 -> Agent 4 -> Agent 6 (-> Agent 5 as hook).
+
+All four core agents plus Agent 6 (escalation) are now wired. Agent 5
+(audit logging) remains a TODO — hook it in where marked once it's ready,
+ideally right after Agent 4 returns (log every decision).
 """
 
 from agent1_classification.auth import (
@@ -26,8 +31,9 @@ from agent5_audit_logging.logger import (
     log_retrieval,
     log_verification,
 )
+from agent6_escalation.escalation import evaluate_escalation
 from shared.enums import UserRole
-from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output
+from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output, Agent6Output
 
 # Instantiated once at import time — loading the embedder + vector store on
 # every query would be wasteful. Requires `python -m agent2_retrieval.ingest`
@@ -99,8 +105,9 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
 
     Returns a dict with at least `agent1_output`. On a normal completed
     run it also includes `agent2_output`, `agent3_output`, `agent4_output`,
-    and `final_response` (the actual text/citations the caller should show
-    the user, already access-controlled and fact-checked by Agent 4).
+    `agent6_output`, and `final_response` (the actual text/citations the
+    caller should show the user, already access-controlled, fact-checked
+    by Agent 4, and screened for human handoff by Agent 6).
     """
     try:
         agent1_output: Agent1Output = classify_query(
@@ -145,10 +152,12 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
         log_verification(agent4_output),
     ]
 
-    # TODO (Agent 6 owner): when agent4_output.decision == "escalated",
-    # route to human review here instead of just returning the status.
+    agent6_output: Agent6Output = evaluate_escalation(agent4_output, agent1_output)
 
-    if agent4_output.decision.value == "approved":
+    if agent6_output.escalation_triggered:
+        status = "escalated"
+        message_to_user = agent6_output.user_facing_message
+    elif agent4_output.decision.value == "approved":
         status = "answered"
         message_to_user = agent4_output.final_answer
         if agent4_output.version_conflict_detected:
@@ -163,7 +172,7 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
     elif agent4_output.decision.value == "denied":
         status = "denied"
         message_to_user = _message_for_reason(agent4_output.denial_reason, denied=True)
-    else:  # escalated
+    else:  # decision == "escalated" but Agent 6 didn't independently trigger
         status = "escalated"
         message_to_user = _message_for_reason(agent4_output.denial_reason, denied=False)
 
@@ -173,12 +182,13 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
         "agent3_output": agent3_output,
         "agent4_output": agent4_output,
         "agent5_records": audit_records,
+        "agent6_output": agent6_output,
         "status": status,
         "message_to_user": message_to_user,
         "final_response": {
             "answer": agent4_output.final_answer,
             "citations": agent4_output.final_citations,
-        } if agent4_output.decision.value == "approved" else None,
+        } if status == "answered" else None,
     }
 
 
@@ -255,5 +265,14 @@ if __name__ == "__main__":
             print(f"    summary:    {rec.decision_summary}")
             print(f"    hash:       {rec.immutable_hash}")
             print(f"    timestamp:  {rec.timestamp}")
+    if "agent6_output" in result:
+        a6 = result["agent6_output"]
+        print("\n--- Agent 6 Output ---")
+        print(f"Escalation Triggered?: {a6.escalation_triggered}")
+        if a6.escalation_triggered:
+            print(f"Trigger Reason:        {a6.trigger_reason.value}")
+            print(f"Routed To:             {a6.routed_to}")
+            print(f"Priority:              {a6.priority.value}")
+            print(f"User-Facing Message:   {a6.user_facing_message}")
 
     print("------------------------\n")
