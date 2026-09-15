@@ -1,7 +1,12 @@
 python-dotenv
-google-generativeai
-chromadb
+google-genai
 sentence-transformers
 fastapi
 uvicorn
 pydantic
+sqlalchemy
+psycopg2-binary
+pgvector
+alembic
+passlib
+bcrypt==4.0.1

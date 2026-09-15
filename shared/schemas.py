@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
@@ -23,7 +24,7 @@ class Agent1Input(BaseModel):
     session_id: str
     user_role: UserRole
     raw_query: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class InputFlags(BaseModel):
@@ -42,8 +43,7 @@ class Agent1Output(BaseModel):
     needs_clarification: bool = False
     clarifying_question: Optional[str] = None
     flags: InputFlags = Field(default_factory=InputFlags)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ---------- Agent 2: Knowledge Retrieval ----------
 
@@ -68,8 +68,7 @@ class Agent2Output(BaseModel):
     results: list[RetrievedChunk] = Field(default_factory=list)
     retrieval_confidence: RetrievalConfidence
     access_filter_applied: bool = True
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ---------- Agent 3: Knowledge Analysis & Response ----------
 
@@ -88,8 +87,7 @@ class Agent3Output(BaseModel):
     chunks_used: list[str] = Field(default_factory=list)
     chunks_discarded: list[str] = Field(default_factory=list)
     synthesis_notes: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ---------- Agent 4: Verification & Governance ----------
 
@@ -111,8 +109,7 @@ class Agent4Output(BaseModel):
     final_answer: Optional[str] = None
     final_citations: list[FinalCitation] = Field(default_factory=list)
     confidence: float
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ---------- Agent 5: Audit & Compliance Logging ----------
 
@@ -123,7 +120,7 @@ class AuditLogRecord(BaseModel):
     agent: str
     payload_snapshot: dict
     decision_summary: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     immutable_hash: str
 
 
@@ -136,4 +133,4 @@ class Agent6Output(BaseModel):
     routed_to: str = "human_review_queue"
     user_facing_message: str
     priority: Priority
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
