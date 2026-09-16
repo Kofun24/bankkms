@@ -150,15 +150,12 @@ def test_all_four_stages_round_trip_correctly(track_log_ids):
         assert match.agent == expected.agent
 
 
-def test_tampering_a_db_record_is_detected_by_verify_chain(track_log_ids, monkeypatch):
+def test_tampering_a_db_record_is_detected_by_verify_chain(track_log_ids):
     """Directly UPDATEs a row's decision_summary (simulating someone
     editing the table by hand or a compromised process), then confirms
-    verify_chain (via read_all_records, driven by the db backend) flags
-    it. Forces AUDIT_LOG_BACKEND to 'db' for the duration of this test
-    only, since verify_chain()/read_all_records() dispatch on that
-    config value when no explicit log_path is given."""
+    logger.verify_chain() flags it. verify_chain() always reads from
+    Postgres (no backend toggle needed), so no monkeypatching required."""
     import agent5_audit_logging.logger as logger_module
-    monkeypatch.setattr(logger_module, "AUDIT_LOG_BACKEND", "db")
 
     session_id = _test_session_id()
     record = _append_test_record(
