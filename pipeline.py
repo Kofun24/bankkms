@@ -21,6 +21,7 @@ from agent3_response.responder import analyze_and_respond
 from agent4_verification.verifier import run_agent4
 from shared.enums import UserRole, VerificationDecision
 from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output
+from agent1_classification.fast_path import check_fast_path
 
 # Instantiated once at import time — loading the embedder + vector store on
 # every query would be wasteful. Requires `python -m agent2_retrieval.ingest`
@@ -60,6 +61,13 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
     Returns a dict with at least `agent1_output`. Once Agent 4 lands,
     this will also include `agent4_output`/`final_response`.
     """
+    fast_response = check_fast_path(raw_query)
+    if fast_response is not None:
+        return {
+            "status": "answered",
+            "message_to_user": fast_response,
+        }
+
     try:
         agent1_output: Agent1Output = classify_query(
             session_id=session_id,
