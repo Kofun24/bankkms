@@ -28,6 +28,7 @@ from agent5_audit_logging.logger import (
 )
 from shared.enums import UserRole
 from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output
+from agent1_classification.fast_path import check_fast_path
 
 # Instantiated once at import time — loading the embedder + vector store on
 # every query would be wasteful. Requires `python -m agent2_retrieval.ingest`
@@ -102,6 +103,13 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
     and `final_response` (the actual text/citations the caller should show
     the user, already access-controlled and fact-checked by Agent 4).
     """
+    fast_response = check_fast_path(raw_query)
+    if fast_response is not None:
+        return {
+            "status": "answered",
+            "message_to_user": fast_response,
+        }
+
     try:
         agent1_output: Agent1Output = classify_query(
             session_id=session_id,
