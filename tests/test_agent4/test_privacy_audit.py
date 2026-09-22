@@ -1,27 +1,51 @@
 """
 tests/test_agent4/test_privacy_audit.py
 
-Individual assignment — Member 4: Privacy & Data Leakage Assessment
-Continues the AUD-numbered case set (AUD-01..AUD-15 already cover access
-bypass, hallucination leakage, version conflicts, confidence boundaries,
-and malformed input). This file adds the two areas the project plan
-calls out that weren't covered yet: conversation/session isolation, and
-PII exposure in the audit log.
+Individual Assignment — Member 4
+Privacy & Data Leakage Assessment
 
-Runs against the REAL shared database (Agent 5's audit_log table),
-following the same append-then-cleanup safety pattern as
-tests/test_agent5/ -- every test only ever creates and later deletes its
-own rows, never touching pre-existing data. See track_log_ids below.
+This file contains exactly 15 AUD test cases:
 
-Run with:
-    python -m pytest tests/test_agent4/test_privacy_audit.py -v
+AUD-01  Authorized public access
+AUD-02  Internal session accessing public document
+AUD-03  Restricted session accessing internal document
+AUD-04  Public session blocked from internal document
+AUD-05  Public session blocked from restricted document
+AUD-06  Internal session blocked from restricted document
+AUD-07  Missing / forged citation blocked
+AUD-08  Agent 3 / Agent 2 citation mismatch blocked
+AUD-09  Insufficient evidence blocked
+AUD-10  Low factual confidence handled safely
+AUD-11  Conversation / session isolation
+AUD-12  Audit-log session isolation
+AUD-13  PII exposure in audit log
+AUD-14  Version conflict detection
+AUD-15  Malformed / non-existent chunk handled safely
+
+Run only the 15 privacy tests:
+
+    python -m pytest tests/test_agent4/test_privacy_audit.py -v -s
+
+Run one AUD test:
+
+    python -m pytest tests/test_agent4/test_privacy_audit.py -v -s -k AUD-05
 """
+
+from __future__ import annotations
 
 import uuid
 
 import pytest
 
-from agent4_verification.verifier import run_agent4
+from agent4_verification.verifier import (
+    check_access_reconfirm,
+    check_evidence_sufficiency,
+    check_factual_support,
+    check_version_conflict,
+    llm_factual_support_check,
+    run_agent4,
+)
+
 from agent5_audit_logging.logger import (
     log_classification,
     log_generation,
@@ -29,7 +53,16 @@ from agent5_audit_logging.logger import (
     log_verification,
     read_records_for_session,
 )
-from shared.enums import AccessLevel, Intent, RetrievalConfidence, UserRole
+
+from shared.enums import (
+    AccessLevel,
+    EvidenceSufficiency,
+    FactualSupportCheck,
+    Intent,
+    RetrievalConfidence,
+    UserRole,
+)
+
 from shared.schemas import (
     Agent1Output,
     Agent2Output,
@@ -39,35 +72,29 @@ from shared.schemas import (
 )
 
 
+# ==========================================================================
+# Helper functions
+# ==========================================================================
+
 def _unique_session_id() -> str:
+    """
+    Generate an isolated session ID for each privacy test.
+    """
     return f"test_privacy_{uuid.uuid4().hex[:8]}"
 
 
-@pytest.fixture
-def track_log_ids():
-    """Same safety pattern as tests/test_agent5/conftest.py: collects
-    log_ids appended during a test, deletes exactly those rows afterward.
-    Never touches anything that existed before the test."""
-    from database.config import SessionLocal
-    from database.models import AuditLog
+def _build_pipeline_stage(
+    session_id: str,
+    topic_text: str,
+    answer_text: str,
+):
+    """
+    Build a realistic Agent 1 → Agent 2 → Agent 3 pipeline state.
 
-    ids: list[str] = []
-    yield ids
-    if ids:
-        db = SessionLocal()
-        try:
-            db.query(AuditLog).filter(
-                AuditLog.log_id.in_([uuid.UUID(i) for i in ids])
-            ).delete(synchronize_session=False)
-            db.commit()
-        finally:
-            db.close()
+    Each call creates a unique document and chunk so that two sessions
+    cannot accidentally share identifiers.
+    """
 
-
-def _build_pipeline_stage(session_id: str, topic_text: str, answer_text: str):
-    """Builds a minimal but realistic (agent1, agent2, agent3) triple for
-    one fake session, so each test can construct two clearly distinct
-    'conversations' and prove nothing bleeds between them."""
     chunk_id = f"c_{uuid.uuid4().hex[:6]}"
     doc_id = f"doc_{uuid.uuid4().hex[:6]}"
 
@@ -80,148 +107,647 @@ def _build_pipeline_stage(session_id: str, topic_text: str, answer_text: str):
         normalized_query=topic_text,
         confidence=0.9,
     )
+
     agent2 = Agent2Output(
         session_id=session_id,
         query_used=topic_text,
         access_level=AccessLevel.PUBLIC,
         results=[
             RetrievedChunk(
-                doc_id=doc_id, doc_title="Test Doc", chunk_id=chunk_id,
-                chunk_text=answer_text, similarity_score=0.9,
-                doc_access_level=AccessLevel.PUBLIC, doc_version="v1",
-                effective_date="2024-01-01", source_section="Section 1",
+                doc_id=doc_id,
+                doc_title="Test Doc",
+                chunk_id=chunk_id,
+                chunk_text=answer_text,
+                similarity_score=0.9,
+                doc_access_level=AccessLevel.PUBLIC,
+                doc_version="v1",
+                effective_date="2024-01-01",
+                source_section="Section 1",
             )
         ],
         retrieval_confidence=RetrievalConfidence.HIGH,
     )
+
     agent3 = Agent3Output(
         session_id=session_id,
         answer_text=answer_text,
         grounded=True,
-        citations=[Citation(doc_id=doc_id, doc_title="Test Doc",
-                              section="Section 1", chunk_id=chunk_id)],
+        citations=[
+            Citation(
+                doc_id=doc_id,
+                doc_title="Test Doc",
+                section="Section 1",
+                chunk_id=chunk_id,
+            )
+        ],
         chunks_used=[chunk_id],
     )
+
     return agent1, agent2, agent3
 
 
+@pytest.fixture
+def track_log_ids():
+    """
+    Track only the audit-log records created by the current test.
+
+    After the test finishes, those records are removed.
+
+    Existing database records are never deleted.
+    """
+
+    from database.config import SessionLocal
+    from database.models import AuditLog
+
+    ids: list[str] = []
+
+    yield ids
+
+    if ids:
+
+        db = SessionLocal()
+
+        try:
+
+            db.query(AuditLog).filter(
+                AuditLog.log_id.in_(
+                    [uuid.UUID(i) for i in ids]
+                )
+            ).delete(
+                synchronize_session=False
+            )
+
+            db.commit()
+
+        finally:
+            db.close()
+
+
 # ==========================================================================
-# AUD-16: Conversation / session isolation
+# AUD-01
 # ==========================================================================
 
-def test_AUD16_agent4_output_never_mixes_content_across_sessions(monkeypatch):
-    """AUD-16: Two structurally unrelated sessions run through Agent 4.
-    Confirms session A's output contains nothing from session B's
-    content (and vice versa) -- proving there's no shared mutable state
-    in verifier.py that could leak one user's answer into another's."""
-    import agent4_verification.verifier as v
-    monkeypatch.setattr(v, "llm_factual_support_check", lambda a, c: ("pass", 0.95))
+def test_AUD01_authorized_public_access_is_allowed(
+    make_chunk,
+    make_citation,
+    make_agent3_output,
+):
+    """
+    AUD-01: Confirms that a public session can access a public document
+    when the citation and retrieved chunk are valid.
+    """
+
+    chunk = make_chunk(
+        doc_id="aud01_public_doc",
+        chunk_id="aud01_chunk",
+        doc_access_level=AccessLevel.PUBLIC,
+    )
+
+    citation = make_citation(
+        doc_id="aud01_public_doc",
+        chunk_id="aud01_chunk",
+    )
+
+    agent3 = make_agent3_output(
+        citations=[citation],
+        chunks_used=["aud01_chunk"],
+    )
+
+    lookup = {
+        "aud01_chunk": chunk,
+    }
+
+    ok, violations = check_access_reconfirm(
+        AccessLevel.PUBLIC,
+        agent3,
+        lookup,
+    )
+
+    assert ok is True
+    assert violations == []
+
+
+# ==========================================================================
+# AUD-02
+# ==========================================================================
+
+def test_AUD02_internal_session_can_access_public_document(
+    make_chunk,
+    make_citation,
+    make_agent3_output,
+):
+    """
+    AUD-02: Confirms that an internal-authorized session can access a
+    lower-tier public document without triggering an access violation.
+    """
+
+    chunk = make_chunk(
+        doc_id="aud02_public_doc",
+        chunk_id="aud02_chunk",
+        doc_access_level=AccessLevel.PUBLIC,
+    )
+
+    citation = make_citation(
+        doc_id="aud02_public_doc",
+        chunk_id="aud02_chunk",
+    )
+
+    agent3 = make_agent3_output(
+        citations=[citation],
+        chunks_used=["aud02_chunk"],
+    )
+
+    lookup = {
+        "aud02_chunk": chunk,
+    }
+
+    ok, violations = check_access_reconfirm(
+        AccessLevel.INTERNAL,
+        agent3,
+        lookup,
+    )
+
+    assert ok is True
+    assert violations == []
+
+
+# ==========================================================================
+# AUD-03
+# ==========================================================================
+
+def test_AUD03_restricted_session_can_access_internal_document(
+    make_chunk,
+    make_citation,
+    make_agent3_output,
+):
+    """
+    AUD-03: Confirms that a restricted-authorized session can access an
+    internal document because the session has a higher authorization tier.
+    """
+
+    chunk = make_chunk(
+        doc_id="aud03_internal_doc",
+        chunk_id="aud03_chunk",
+        doc_access_level=AccessLevel.INTERNAL,
+    )
+
+    citation = make_citation(
+        doc_id="aud03_internal_doc",
+        chunk_id="aud03_chunk",
+    )
+
+    agent3 = make_agent3_output(
+        citations=[citation],
+        chunks_used=["aud03_chunk"],
+    )
+
+    lookup = {
+        "aud03_chunk": chunk,
+    }
+
+    ok, violations = check_access_reconfirm(
+        AccessLevel.RESTRICTED,
+        agent3,
+        lookup,
+    )
+
+    assert ok is True
+    assert violations == []
+
+
+# ==========================================================================
+# AUD-04
+# ==========================================================================
+
+def test_AUD04_public_session_is_blocked_from_internal_document(
+    make_chunk,
+    make_citation,
+    make_agent3_output,
+):
+    """
+    AUD-04: Attempts to expose an internal document to a public session.
+    Agent 4 must detect the access violation and block the document.
+    """
+
+    chunk = make_chunk(
+        doc_id="aud04_internal_doc",
+        chunk_id="aud04_chunk",
+        doc_access_level=AccessLevel.INTERNAL,
+    )
+
+    citation = make_citation(
+        doc_id="aud04_internal_doc",
+        chunk_id="aud04_chunk",
+    )
+
+    agent3 = make_agent3_output(
+        citations=[citation],
+        chunks_used=["aud04_chunk"],
+    )
+
+    lookup = {
+        "aud04_chunk": chunk,
+    }
+
+    ok, violations = check_access_reconfirm(
+        AccessLevel.PUBLIC,
+        agent3,
+        lookup,
+    )
+
+    assert ok is False
+    assert violations == ["aud04_internal_doc"]
+
+
+# ==========================================================================
+# AUD-05
+# ==========================================================================
+
+def test_AUD05_public_session_is_blocked_from_restricted_document(
+    make_chunk,
+    make_citation,
+    make_agent3_output,
+):
+    """
+    AUD-05: Attempts to expose a restricted document to a public session.
+    This is a direct restricted-document leakage test and must be blocked.
+    """
+
+    chunk = make_chunk(
+        doc_id="aud05_restricted_doc",
+        chunk_id="aud05_chunk",
+        doc_access_level=AccessLevel.RESTRICTED,
+    )
+
+    citation = make_citation(
+        doc_id="aud05_restricted_doc",
+        chunk_id="aud05_chunk",
+    )
+
+    agent3 = make_agent3_output(
+        citations=[citation],
+        chunks_used=["aud05_chunk"],
+    )
+
+    lookup = {
+        "aud05_chunk": chunk,
+    }
+
+    ok, violations = check_access_reconfirm(
+        AccessLevel.PUBLIC,
+        agent3,
+        lookup,
+    )
+
+    assert ok is False
+    assert violations == ["aud05_restricted_doc"]
+
+
+# ==========================================================================
+# AUD-06
+# ==========================================================================
+
+def test_AUD06_internal_session_is_blocked_from_restricted_document(
+    make_chunk,
+    make_citation,
+    make_agent3_output,
+):
+    """
+    AUD-06: Attempts to expose a restricted document to an internal
+    session. Internal authorization must not be sufficient for restricted
+    information.
+    """
+
+    chunk = make_chunk(
+        doc_id="aud06_restricted_doc",
+        chunk_id="aud06_chunk",
+        doc_access_level=AccessLevel.RESTRICTED,
+    )
+
+    citation = make_citation(
+        doc_id="aud06_restricted_doc",
+        chunk_id="aud06_chunk",
+    )
+
+    agent3 = make_agent3_output(
+        citations=[citation],
+        chunks_used=["aud06_chunk"],
+    )
+
+    lookup = {
+        "aud06_chunk": chunk,
+    }
+
+    ok, violations = check_access_reconfirm(
+        AccessLevel.INTERNAL,
+        agent3,
+        lookup,
+    )
+
+    assert ok is False
+    assert violations == ["aud06_restricted_doc"]
+
+
+# ==========================================================================
+# AUD-07
+# ==========================================================================
+
+def test_AUD07_missing_or_forged_citation_fails_closed(
+    happy_path,
+):
+    """
+    AUD-07: Simulates a forged or stale citation whose chunk ID cannot
+    be resolved. Agent 4 must fail closed rather than allowing access.
+    """
+
+    empty_lookup = {}
+
+    ok, violations = check_access_reconfirm(
+        AccessLevel.RESTRICTED,
+        happy_path["agent3"],
+        empty_lookup,
+    )
+
+    assert ok is False
+    assert violations == [
+        happy_path["citation"].doc_id
+    ]
+
+
+# ==========================================================================
+# AUD-08
+# ==========================================================================
+
+def test_AUD08_agent3_citation_not_returned_by_agent2_fails_factual_check(
+    make_citation,
+    make_agent3_output,
+):
+    """
+    AUD-08: Simulates Agent 3 citing a chunk that Agent 2 never returned.
+    This prevents a generated answer from bypassing the retrieval layer.
+    """
+
+    citation = make_citation(
+        doc_id="aud08_phantom_doc",
+        chunk_id="aud08_phantom_chunk",
+    )
+
+    agent3 = make_agent3_output(
+        citations=[citation],
+        chunks_used=["aud08_phantom_chunk"],
+    )
+
+    lookup = {}
+
+    verdict, confidence = check_factual_support(
+        agent3,
+        lookup,
+    )
+
+    assert verdict == FactualSupportCheck.FAIL
+    assert confidence == 0.0
+
+
+# ==========================================================================
+# AUD-09
+# ==========================================================================
+
+def test_AUD09_insufficient_evidence_is_not_accepted(
+    make_agent3_output,
+    make_citation,
+):
+    """
+    AUD-09: Confirms that an answer without sufficient grounding,
+    citations and used chunks is classified as insufficient evidence.
+    """
+
+    citation = make_citation()
+
+    agent3 = make_agent3_output(
+        grounded=False,
+        citations=[citation],
+        chunks_used=["aud09_chunk"],
+    )
+
+    result = check_evidence_sufficiency(agent3)
+
+    assert result == EvidenceSufficiency.INSUFFICIENT
+
+
+# ==========================================================================
+# AUD-10
+# ==========================================================================
+
+def test_AUD10_low_factual_confidence_is_not_treated_as_verified():
+    """
+    AUD-10: Confirms that the offline factual-support fallback produces
+    only 0.5 confidence when source text exists. This is below the
+    Agent 4 approval threshold of 0.6 and therefore cannot by itself
+    establish a confident factual verification.
+    """
+
+    verdict, confidence = llm_factual_support_check(
+        "The minimum balance is LKR 1,000.",
+        ["The minimum balance is LKR 1,000."],
+    )
+
+    assert verdict == "pass"
+    assert confidence == 0.5
+    assert confidence < 0.6
+
+
+# ==========================================================================
+# AUD-11
+# ==========================================================================
+
+def test_AUD11_conversation_content_is_isolated_between_sessions(
+    monkeypatch,
+):
+    """
+    AUD-11: Runs two unrelated conversations through Agent 4 and verifies
+    that content from one session does not appear in the other session's
+    final answer or citations.
+    """
+
+    import agent4_verification.verifier as verifier
+
+    monkeypatch.setattr(
+        verifier,
+        "llm_factual_support_check",
+        lambda answer, chunks: ("pass", 0.95),
+    )
 
     session_a = _unique_session_id()
     session_b = _unique_session_id()
 
-    a1_a, a2_a, a3_a = _build_pipeline_stage(
-        session_a, "savings account minimum balance",
+    agent1_a, agent2_a, agent3_a = _build_pipeline_stage(
+        session_a,
+        "savings account minimum balance",
         "The minimum balance for a savings account is LKR 1,000.",
     )
-    a1_b, a2_b, a3_b = _build_pipeline_stage(
-        session_b, "fraud reporting procedure",
-        "Report suspected fraud immediately via the hotline.",
+
+    agent1_b, agent2_b, agent3_b = _build_pipeline_stage(
+        session_b,
+        "fraud reporting procedure",
+        "Report suspected fraud immediately through the approved hotline.",
     )
 
-    result_a = run_agent4(a1_a, a2_a, a3_a)
-    result_b = run_agent4(a1_b, a2_b, a3_b)
+    result_a = run_agent4(
+        agent1_a,
+        agent2_a,
+        agent3_a,
+    )
+
+    result_b = run_agent4(
+        agent1_b,
+        agent2_b,
+        agent3_b,
+    )
 
     assert result_a.session_id == session_a
     assert result_b.session_id == session_b
 
     assert "1,000" in result_a.final_answer
-    assert "1,000" not in (result_b.final_answer or "")
+    assert "fraud" not in (
+        result_a.final_answer or ""
+    ).lower()
 
-    assert "fraud" in result_b.final_answer.lower()
-    assert "fraud" not in (result_a.final_answer or "").lower()
+    assert "fraud" in (
+        result_b.final_answer or ""
+    ).lower()
 
-    assert {c.doc_id for c in result_a.final_citations}.isdisjoint(
-        {c.doc_id for c in result_b.final_citations}
+    assert "1,000" not in (
+        result_b.final_answer or ""
     )
 
+    citations_a = {
+        citation.doc_id
+        for citation in result_a.final_citations
+    }
 
-def test_AUD16b_audit_log_correctly_isolates_records_per_session(track_log_ids, monkeypatch):
-    """AUD-16 (audit trail side): logs two sessions' full pipelines
-    through Agent 5, then confirms read_records_for_session() for
-    session A returns ONLY session A's payloads -- no leakage through
-    the shared/global hash chain, despite both sessions' records living
-    in the same table and the same continuous chain."""
-    import agent4_verification.verifier as v
-    monkeypatch.setattr(v, "llm_factual_support_check", lambda a, c: ("pass", 0.95))
+    citations_b = {
+        citation.doc_id
+        for citation in result_b.final_citations
+    }
+
+    assert citations_a.isdisjoint(citations_b)
+
+
+# ==========================================================================
+# AUD-12
+# ==========================================================================
+
+def test_AUD12_audit_log_records_are_isolated_by_session(
+    track_log_ids,
+):
+    """
+    AUD-12: Creates audit records for two different sessions and verifies
+    that read_records_for_session() returns only records belonging to the
+    requested session.
+    """
 
     session_a = _unique_session_id()
     session_b = _unique_session_id()
 
-    a1_a, a2_a, a3_a = _build_pipeline_stage(
-        session_a, "savings account minimum balance",
-        "The minimum balance for a savings account is LKR 1,000.",
-    )
-    a1_b, a2_b, a3_b = _build_pipeline_stage(
-        session_b, "fraud reporting procedure",
-        "Report suspected fraud immediately via the hotline.",
+    agent1_a, agent2_a, agent3_a = _build_pipeline_stage(
+        session_a,
+        "savings account minimum balance",
+        "The minimum balance is LKR 1,000.",
     )
 
-    result_a = run_agent4(a1_a, a2_a, a3_a)
-    result_b = run_agent4(a1_b, a2_b, a3_b)
+    agent1_b, agent2_b, agent3_b = _build_pipeline_stage(
+        session_b,
+        "fraud reporting procedure",
+        "Report suspected fraud immediately.",
+    )
 
-    r1 = log_classification(a1_a)
-    r2 = log_retrieval(a2_a)
-    r3 = log_generation(a3_a)
-    r4 = log_verification(result_a)
-    r5 = log_classification(a1_b)
-    r6 = log_retrieval(a2_b)
-    r7 = log_generation(a3_b)
-    r8 = log_verification(result_b)
-    track_log_ids.extend([r.log_id for r in (r1, r2, r3, r4, r5, r6, r7, r8)])
+    result_a = run_agent4(
+        agent1_a,
+        agent2_a,
+        agent3_a,
+    )
+
+    result_b = run_agent4(
+        agent1_b,
+        agent2_b,
+        agent3_b,
+    )
+
+    records = []
+
+    records.append(log_classification(agent1_a))
+    records.append(log_retrieval(agent2_a))
+    records.append(log_generation(agent3_a))
+    records.append(log_verification(result_a))
+
+    records.append(log_classification(agent1_b))
+    records.append(log_retrieval(agent2_b))
+    records.append(log_generation(agent3_b))
+    records.append(log_verification(result_b))
+
+    track_log_ids.extend(
+        [record.log_id for record in records]
+    )
 
     records_a = read_records_for_session(session_a)
     records_b = read_records_for_session(session_b)
 
-    assert all(r.session_id == session_a for r in records_a)
-    assert all(r.session_id == session_b for r in records_b)
     assert len(records_a) == 4
     assert len(records_b) == 4
 
-    a_text = " ".join(str(r.payload_snapshot) for r in records_a)
-    b_text = " ".join(str(r.payload_snapshot) for r in records_b)
-    assert "fraud" not in a_text.lower()
-    assert "1,000" not in b_text or "1,000" in a_text  # sanity: session A's own figure is fine in A
+    assert all(
+        record.session_id == session_a
+        for record in records_a
+    )
+
+    assert all(
+        record.session_id == session_b
+        for record in records_b
+    )
+
+    text_a = " ".join(
+        str(record.payload_snapshot)
+        for record in records_a
+    )
+
+    text_b = " ".join(
+        str(record.payload_snapshot)
+        for record in records_b
+    )
+
+    assert "fraud" not in text_a.lower()
+    assert "1,000" in text_a
+
+    assert "fraud" in text_b.lower()
 
 
 # ==========================================================================
-# AUD-17: PII exposure in the audit log [FINDING]
+# AUD-13
 # ==========================================================================
 
-def test_AUD17_query_containing_pii_like_data_is_stored_unredacted_in_audit_log(track_log_ids):
-    """AUD-17 [FINDING]: If a user types something PII-like into their
-    query (here: a fake account-number-shaped string), it is currently
-    stored VERBATIM in audit_log.payload_snapshot, with no redaction
-    step anywhere in the pipeline.
-
-    This is not a bug in the sense of broken code -- everything works
-    exactly as designed, and having a complete, unaltered audit trail is
-    normally a GOOD compliance property. But it does mean: whatever a
-    user types, including anything sensitive, becomes permanent
-    (append-only, hash-chained -- cannot be edited or deleted without
-    breaking the chain) database content. For a real deployment, this is
-    a genuine design decision to document explicitly rather than assume:
-    either (a) accept this as intended for a compliance audit trail, or
-    (b) add a redaction/masking step in Agent 1's sanitizer before the
-    query is logged (e.g. detecting and masking account-number-shaped
-    strings), applied consistently before it ever reaches Agent 5.
-
-    This test demonstrates current behavior (no redaction), which is
-    what the audit report should cite as the finding.
+def test_AUD13_pii_like_query_is_stored_unredacted_in_audit_log(
+    track_log_ids,
+):
     """
+    AUD-13 [PRIVACY FINDING]: Checks whether an account-number-shaped
+    value entered by a user is stored verbatim in the audit log.
+
+    The test intentionally uses fake data.
+
+    A PASS means the test successfully confirmed the current behavior:
+    the value is stored without redaction.
+
+    Therefore this case is a security/privacy finding, not evidence
+    that the privacy control is secure.
+    """
+
     session_id = _unique_session_id()
-    fake_account_number = "8801234567"  # PII-shaped test data, not real
-    query_with_pii = f"What is the status of account {fake_account_number}?"
+
+    fake_account_number = "8801234567"
+
+    query_with_pii = (
+        f"What is the status of account {fake_account_number}?"
+    )
 
     agent1 = Agent1Output(
         session_id=session_id,
@@ -234,11 +760,141 @@ def test_AUD17_query_containing_pii_like_data_is_stored_unredacted_in_audit_log(
     )
 
     record = log_classification(agent1)
+
     track_log_ids.append(record.log_id)
 
-    stored = read_records_for_session(session_id)
-    stored_text = str(stored[0].payload_snapshot)
+    stored_records = read_records_for_session(
+        session_id
+    )
 
-    # Documents current behavior: the account-number-shaped string is
-    # NOT redacted -- it passes straight through into permanent storage.
+    assert len(stored_records) == 1
+
+    stored_text = str(
+        stored_records[0].payload_snapshot
+    )
+
+    # Current behavior:
+    # the account-number-shaped value remains unredacted.
     assert fake_account_number in stored_text
+
+
+# ==========================================================================
+# AUD-14
+# ==========================================================================
+
+def test_AUD14_conflicting_document_versions_are_detected(
+    make_chunk,
+    make_citation,
+    make_agent3_output,
+):
+    """
+    AUD-14: Simulates an answer that cites two versions of the same
+    policy document. Agent 4 must detect the version conflict.
+    """
+
+    chunk_v1 = make_chunk(
+        doc_id="aud14_doc_v1",
+        chunk_id="aud14_chunk_v1",
+        doc_title="Minimum Balance Policy",
+        doc_version="v1",
+        effective_date="2024-01-01",
+    )
+
+    chunk_v2 = make_chunk(
+        doc_id="aud14_doc_v2",
+        chunk_id="aud14_chunk_v2",
+        doc_title="Minimum Balance Policy",
+        doc_version="v2",
+        effective_date="2025-01-01",
+    )
+
+    citation_v1 = make_citation(
+        doc_id="aud14_doc_v1",
+        doc_title="Minimum Balance Policy",
+        chunk_id="aud14_chunk_v1",
+    )
+
+    citation_v2 = make_citation(
+        doc_id="aud14_doc_v2",
+        doc_title="Minimum Balance Policy",
+        chunk_id="aud14_chunk_v2",
+    )
+
+    agent3 = make_agent3_output(
+        citations=[
+            citation_v1,
+            citation_v2,
+        ],
+        chunks_used=[
+            "aud14_chunk_v1",
+            "aud14_chunk_v2",
+        ],
+    )
+
+    lookup = {
+        "aud14_chunk_v1": chunk_v1,
+        "aud14_chunk_v2": chunk_v2,
+    }
+
+    detected, details = check_version_conflict(
+        agent3,
+        lookup,
+    )
+
+    assert detected is True
+    assert details is not None
+
+    assert "Minimum Balance Policy" in details
+    assert "v1" in details
+    assert "v2" in details
+
+
+# ==========================================================================
+# AUD-15
+# ==========================================================================
+
+def test_AUD15_malformed_nonexistent_chunk_fails_closed(
+    make_citation,
+    make_agent3_output,
+):
+    """
+    AUD-15: Provides a malformed/non-existent chunk reference and verifies
+    that Agent 4 fails closed instead of silently accepting the citation.
+    """
+
+    citation = make_citation(
+        doc_id="aud15_fake_doc",
+        chunk_id="THIS_CHUNK_DOES_NOT_EXIST",
+    )
+
+    agent3 = make_agent3_output(
+        grounded=True,
+        citations=[citation],
+        chunks_used=[
+            "THIS_CHUNK_DOES_NOT_EXIST"
+        ],
+    )
+
+    lookup = {}
+
+    access_ok, violations = check_access_reconfirm(
+        AccessLevel.PUBLIC,
+        agent3,
+        lookup,
+    )
+
+    assert access_ok is False
+    assert violations == [
+        "aud15_fake_doc"
+    ]
+
+    factual_verdict, factual_confidence = (
+        check_factual_support(
+            agent3,
+            lookup,
+        )
+    )
+
+    assert factual_verdict == FactualSupportCheck.FAIL
+    assert factual_confidence == 0.0
+
