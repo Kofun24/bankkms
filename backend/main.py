@@ -359,3 +359,33 @@ def chat(payload: ChatRequest):
 def new_chat_session():
     """Generates a fresh anonymous session token for a new customer visitor."""
     return {"session_id": str(uuid.uuid4())}
+
+# ---------------- Staff Login (Employee / Compliance) ----------------
+
+class StaffLoginResponse(BaseModel):
+    session_id: str
+    username: str
+    role: str
+    access_level: str
+
+
+@app.post("/api/staff/login", response_model=StaffLoginResponse)
+def staff_login(payload: LoginRequest):
+    try:
+        ctx = auth_login(payload.username, payload.password)
+    except InvalidCredentialsError:
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+    if ctx.user_role not in (UserRole.EMPLOYEE, UserRole.COMPLIANCE):
+        end_session(ctx.session_id)
+        raise HTTPException(
+            status_code=403,
+            detail="This portal is for employee and compliance accounts only.",
+        )
+
+    return StaffLoginResponse(
+        session_id=ctx.session_id,
+        username=payload.username,
+        role=ctx.user_role.value,
+        access_level=ctx.access_level.value,
+    )
