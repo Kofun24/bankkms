@@ -31,9 +31,6 @@ from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Outpu
 from agent1_classification.fast_path import check_fast_path
 from agent6_escalation.escalation import evaluate_escalation
 
-
-
-
 # Instantiated once at import time — loading the embedder + vector store on
 # every query would be wasteful. Requires `python -m agent2_retrieval.ingest`
 # to have been run at least once so the index exists on disk.
