@@ -13,20 +13,26 @@ This module currently implements:
   - the VERSION_CONFLICT trigger (Member 4 / Agent 4 owner's contribution)
   - the SUSPICIOUS_PATTERN trigger (Member 1 / Agent 1 owner's contribution) —
     reads agent1_output.flags.possible_injection_attempt
+  - the REPEATED_DENIAL trigger (Member 4 / Agent 5 owner's contribution) —
+    counts prior 'denied' verification records for this session via
+    agent5_audit_logging.logger.read_records_for_session()
   - the overall Agent 6 entry point that turns a triggered check into a
     structured Agent6Output per interfaces.md
-
-REPEATED_DENIAL trigger is still stubbed — it needs session history from
-Agent 5, which isn't wired up yet.
 """
 
-from typing import Optional
+from typing import Callable, Optional
 
-from shared.enums import EscalationReason, Priority, VerificationDecision
+from shared.enums import EscalationReason, LogStage, Priority, VerificationDecision
 from shared.schemas import Agent1Output, Agent4Output, Agent6Output
 
 # Threshold used to decide when Agent 4's confidence is too low
 ESCALATION_CONFIDENCE_THRESHOLD = 0.5
+
+# Number of prior "denied" verification records in the SAME session that
+# triggers a repeated-denial escalation. 2 means: the user has already
+# been denied twice before this call — a third automated no is unlikely
+# to help; route to a human instead.
+REPEATED_DENIAL_THRESHOLD = 2
 
 
 # ---------------------------------------------------------------------------
@@ -69,12 +75,44 @@ def check_suspicious_pattern_trigger(agent1_output: Optional[Agent1Output]) -> b
     return agent1_output.flags.possible_injection_attempt
 
 
-# Placeholder for future repeated-denial detection
-def check_repeated_denial_trigger(agent4_output: Agent4Output) -> bool:
-    """TODO (whoever owns session/audit history, likely tied to Agent 5):
-    needs a count of prior 'denied' decisions for this session_id, not
-    available from a single Agent4Output alone."""
-    return False
+def check_repeated_denial_trigger(prior_denied_count: int) -> bool:
+    """Member 4 / Agent 5 owner's contribution.
+
+    Fires when this session already has REPEATED_DENIAL_THRESHOLD or
+    more prior 'denied' VERIFICATION-stage records in the audit log.
+    Takes the count as a plain int (not the session_id) so this function
+    stays pure and independently testable, matching the style of every
+    other trigger check here — the actual database query lives in
+    count_prior_denied_verifications() below, called once by
+    evaluate_escalation() and threaded through.
+    """
+    return prior_denied_count >= REPEATED_DENIAL_THRESHOLD
+
+
+def count_prior_denied_verifications(
+    session_id: str,
+    session_factory: Optional[Callable] = None,
+) -> int:
+    """Queries Agent 5's audit log for how many VERIFICATION-stage
+    records in this session were already 'denied', BEFORE the current
+    call (the current Agent4Output hasn't been logged yet at the point
+    Agent 6 runs — see pipeline.py's ordering — so there's no
+    double-counting risk).
+
+    session_factory is optional and passed straight through to
+    read_records_for_session() — omit it in production (defaults to the
+    real database); pass an isolated session factory in tests, same
+    pattern as everywhere else in agent5_audit_logging.
+    """
+    from agent5_audit_logging.logger import read_records_for_session
+
+    kwargs = {} if session_factory is None else {"session_factory": session_factory}
+    records = read_records_for_session(session_id, **kwargs)
+
+    return sum(
+        1 for r in records
+        if r.stage == LogStage.VERIFICATION and r.decision_summary.startswith("decision=denied")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +154,7 @@ _USER_MESSAGE_BY_REASON = {
 def determine_trigger_reason(
     agent4_output: Agent4Output,
     agent1_output: Optional[Agent1Output] = None,
+    prior_denied_count: int = 0,
 ) -> Optional[EscalationReason]:
     """Runs all trigger checks in priority order, returns the first reason
     that fires, or None if nothing warrants escalation."""
@@ -123,7 +162,7 @@ def determine_trigger_reason(
         return EscalationReason.VERSION_CONFLICT
     if check_suspicious_pattern_trigger(agent1_output):
         return EscalationReason.SUSPICIOUS_PATTERN
-    if check_repeated_denial_trigger(agent4_output):
+    if check_repeated_denial_trigger(prior_denied_count):
         return EscalationReason.REPEATED_DENIAL
     if check_low_confidence_trigger(agent4_output):
         return EscalationReason.LOW_CONFIDENCE
@@ -138,20 +177,29 @@ def determine_trigger_reason(
 def evaluate_escalation(
     agent4_output: Agent4Output,
     agent1_output: Optional[Agent1Output] = None,
+    session_factory: Optional[Callable] = None,
 ) -> Agent6Output:
     """Main entry point for Agent 6.
 
     Runs all trigger checks against Agent 4's output (and, if provided,
-    Agent 1's output for the suspicious-pattern trigger). If none fire
-    and Agent 4 didn't already mark the decision as escalated, returns a
-    'no escalation needed' Agent6Output (escalation_triggered=False) so
-    the pipeline always gets a well-formed object rather than None.
+    Agent 1's output for the suspicious-pattern trigger), including a
+    real query against Agent 5's audit log for the repeated-denial
+    trigger. If none fire and Agent 4 didn't already mark the decision
+    as escalated, returns a 'no escalation needed' Agent6Output
+    (escalation_triggered=False) so the pipeline always gets a
+    well-formed object rather than None.
 
     agent1_output is optional and defaults to None for backward
     compatibility with any existing caller that only has agent4_output —
     the suspicious-pattern trigger simply won't fire in that case.
+
+    session_factory is optional and passed through to Agent 5's audit
+    log query — omit it in production, pass an isolated factory in tests.
     """
-    reason = determine_trigger_reason(agent4_output, agent1_output)
+    prior_denied_count = count_prior_denied_verifications(
+        agent4_output.session_id, session_factory=session_factory
+    )
+    reason = determine_trigger_reason(agent4_output, agent1_output, prior_denied_count)
 
     # Return normally when no escalation condition is detected
     if reason is None and agent4_output.decision != VerificationDecision.ESCALATED:
