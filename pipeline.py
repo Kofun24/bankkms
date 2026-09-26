@@ -20,6 +20,7 @@ from agent2_retrieval.retriever import Agent2Retriever
 from agent3_response.responder import analyze_and_respond
 from agent4_verification.db_integration import version_lookup_from_db
 from agent4_verification.verifier import run_agent4
+from agent1_classification.fast_path import check_fast_path
 from agent6_escalation.escalation import evaluate_escalation
 from shared.enums import UserRole
 from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output, Agent6Output
@@ -40,6 +41,13 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
     caller should show the user, already access-controlled, fact-checked
     by Agent 4, and screened for human handoff by Agent 6).
     """
+    fast_response = check_fast_path(raw_query)
+    if fast_response is not None:
+        return {
+            "status": "answered",
+            "message_to_user": fast_response,
+        }
+
     try:
         agent1_output: Agent1Output = classify_query(
             session_id=session_id,
