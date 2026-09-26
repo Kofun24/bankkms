@@ -1,0 +1,21 @@
+{
+  "test_id": "DIAG-0b",
+  "timestamp_utc": "2026-09-26T14:26:23.814326+00:00",
+  "category": "Diagnostic",
+  "role": "customer",
+  "objective": "Check if turn 2 recalls turn 1's topic (session memory test)",
+  "message": "Does that same amount also apply to a current account, or is it different?",
+  "result": {
+    "http_status": 200,
+    "request_body": {
+      "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+      "message": "Does that same amount also apply to a current account, or is it different?"
+    },
+    "request_had_authorization_header": false,
+    "response_body": {
+      "status": "answered",
+      "message_to_user": "A current account is designed for customers and businesses with frequent transaction needs, offering unlimited withdrawals and deposits, but it does not earn interest.",
+      "needs_clarification": false
+    }
+  }
+}
