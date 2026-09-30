@@ -2,11 +2,17 @@
 pipeline.py
 
 Top-level orchestration for the BankKMS pipeline. Wires agents together in
-sequence: Agent 1 -> Agent 2 -> Agent 3 -> Agent 4 (-> Agent 5/6 as hooks).
+sequence: Agent 1 -> Agent 2 -> Agent 3 -> Agent 4 -> Agent 5 (audit log)
+-> Agent 6 (escalation).
 
-Currently Agents 1-3 are implemented. Agent 4 is stubbed as a TODO so
-the pipeline runs end-to-end (returning early after synthesis) without
-crashing, and can be extended as its owner finishes their part.
+All six agents are now wired:
+  - Agent 1: classification
+  - Agent 2: retrieval
+  - Agent 3: response generation
+  - Agent 4: verification
+  - Agent 5: audit logging (every stage logged independently — see note
+    below)
+  - Agent 6: escalation handoff to human review
 """
 
 from agent1_classification.auth import (
@@ -16,50 +22,103 @@ from agent1_classification.auth import (
 )
 from agent1_classification.classifier import classify_query
 from agent1_classification.gemini_classifier import gemini_classify
+from agent1_classification.fast_path import check_fast_path
 from agent2_retrieval.retriever import Agent2Retriever
 from agent3_response.responder import analyze_and_respond
+from agent4_verification.db_integration import version_lookup_from_db
 from agent4_verification.verifier import run_agent4
-from shared.enums import UserRole, VerificationDecision
-from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output
+from agent5_audit_logging.logger import (
+    log_classification,
+    log_generation,
+    log_retrieval,
+    log_verification,
+)
+from agent6_escalation.escalation import evaluate_escalation
+from shared.enums import UserRole
+from shared.schemas import Agent1Output, Agent2Output, Agent3Output, Agent4Output, Agent6Output
 
 # Instantiated once at import time — loading the embedder + vector store on
 # every query would be wasteful. Requires `python -m agent2_retrieval.ingest`
 # to have been run at least once so the index exists on disk.
 _agent2 = Agent2Retriever()
 
-def _user_facing_message(agent4_output: Agent4Output, agent3_output: Agent3Output) -> str:
-    """Builds what the end user actually sees, based on Agent 4's decision.
-    Denial/escalation reasons carry internal detail (doc_ids, thresholds)
-    that must never reach the user directly -- only Agent 4's structured
-    output (for audit/logging) keeps that detail."""
-    if agent4_output.decision == VerificationDecision.APPROVED:
-        return agent4_output.final_answer
- 
-    if agent4_output.decision == VerificationDecision.DENIED:
-        if agent4_output.denial_reason and agent4_output.denial_reason.startswith(
-            "access_violation"
-        ):
-            return (
-                "I'm not able to share that information with your current "
-                "access level. If you believe this is a mistake, please "
-                "contact your administrator."
-            )
-        # insufficient_evidence, or any other denial reason
-        return agent3_output.answer_text  # Agent 3's own refusal text
- 
-    # escalated
-    return (
-        "I want to make sure this answer is accurate before sharing it, so "
-        "I've forwarded your question for review. You'll hear back shortly."
-    )
+
+# Maps the machine-readable reason prefixes verifier.py's decide() produces
+# (e.g. "access_violation: ...", "low_retrieval_confidence: ...") to an
+# actual user-facing sentence. Matched by prefix so the doc_ids / conflict
+# details verifier.py appends after the colon don't break the lookup.
+# A reason that doesn't match anything here (shouldn't normally happen,
+# but keeps this forward-compatible if decide() ever adds a new branch)
+# falls back to a safe generic message rather than crashing.
+_REASON_MESSAGES: dict[str, str] = {
+    "access_violation": (
+        "I can't share that information — it's outside what your account "
+        "is authorized to access."
+    ),
+    "insufficient_evidence": (
+        "I don't have reliable information in the knowledge base to "
+        "answer that confidently."
+    ),
+    "factual_check_failed": (
+        "I found some related information, but couldn't fully confirm its "
+        "accuracy, so this has been flagged for review before I can answer "
+        "confidently."
+    ),
+    "version_conflict": (
+        "There appear to be multiple versions of this policy on record. "
+        "This needs a quick review so you get the current, correct answer."
+    ),
+    "low_retrieval_confidence": (
+        "I couldn't find a strong match for your question in the knowledge "
+        "base, so this has been flagged for review."
+    ),
+    "low_confidence": (
+        "I'm not confident enough in this answer yet, so it's been flagged "
+        "for a closer look before I respond."
+    ),
+}
+
+_DENIED_FALLBACK = (
+    "I can't provide that information — it may be outside what you're "
+    "authorized to access, or I don't have reliable information to answer "
+    "confidently."
+)
+_ESCALATED_FALLBACK = (
+    "This needs a closer look before I can answer confidently. It's been "
+    "flagged for review."
+)
+
+
+def _message_for_reason(reason: str | None, denied: bool) -> str:
+    """Turns verifier.py's internal reason string into the sentence the
+    user actually sees. Matches by prefix (reason strings look like
+    'access_violation: cited document(s) exceed...') so appended details
+    (doc_ids, conflict specifics) don't break the lookup."""
+    if reason:
+        prefix = reason.split(":", 1)[0].strip()
+        if prefix in _REASON_MESSAGES:
+            return _REASON_MESSAGES[prefix]
+    return _DENIED_FALLBACK if denied else _ESCALATED_FALLBACK
+
 
 def run_pipeline(session_id: str, raw_query: str) -> dict:
     """
     Runs the full BankKMS pipeline for a single user query.
 
-    Returns a dict with at least `agent1_output`. Once Agent 4 lands,
-    this will also include `agent4_output`/`final_response`.
+    Returns a dict with at least `agent1_output`. On a normal completed
+    run it also includes `agent2_output`, `agent3_output`, `agent4_output`,
+    `agent5_records`, `agent6_output`, and `final_response` (the actual
+    text/citations the caller should show the user, already
+    access-controlled and fact-checked by Agent 4, and screened for human
+    handoff by Agent 6).
     """
+    fast_response = check_fast_path(raw_query)
+    if fast_response is not None:
+        return {
+            "status": "answered",
+            "message_to_user": fast_response,
+        }
+
     try:
         agent1_output: Agent1Output = classify_query(
             session_id=session_id,
@@ -87,25 +146,63 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
     agent2_output: Agent2Output = _agent2.run(agent1_output)
 
     agent3_output: Agent3Output = analyze_and_respond(agent2_output)
-    
-    agent4_output: Agent4Output = run_agent4(agent1_output, agent2_output, agent3_output)
 
-    # TODO (Agent 4 owner): call verification here
-    # agent4_output = verify_response(agent3_output, agent1_output)
+    agent4_output: Agent4Output = run_agent4(
+        agent1_output, agent2_output, agent3_output,
+        version_lookup=version_lookup_from_db,
+    )
+
+    # Every stage gets logged independently, not just the final decision —
+    # so a compromised/buggy earlier agent can't also hide its own tracks
+    # by the pipeline skipping a log entry on its behalf.
+    audit_records = [
+        log_classification(agent1_output),
+        log_retrieval(agent2_output),
+        log_generation(agent3_output),
+        log_verification(agent4_output),
+    ]
+
+    agent6_output: Agent6Output = evaluate_escalation(agent4_output, agent1_output)
+
+    if agent6_output.escalation_triggered:
+        status = "escalated"
+        message_to_user = agent6_output.user_facing_message
+    elif agent4_output.decision.value == "approved":
+        status = "answered"
+        message_to_user = agent4_output.final_answer
+        if agent4_output.version_conflict_detected:
+            # Not a blocker — Agent 2 already retrieved only the current
+            # version, so the answer itself is correct. This is purely a
+            # transparency note: the document has prior versions on
+            # record, worth surfacing since policy figures do change.
+            message_to_user += (
+                "\n\n(Note: this policy has been updated before — the "
+                "figures above reflect the current version.)"
+            )
+    elif agent4_output.decision.value == "denied":
+        status = "denied"
+        message_to_user = _message_for_reason(agent4_output.denial_reason, denied=True)
+    else:  # decision == "escalated" but Agent 6 didn't independently trigger
+        status = "escalated"
+        message_to_user = _message_for_reason(agent4_output.denial_reason, denied=False)
 
     return {
         "agent1_output": agent1_output,
         "agent2_output": agent2_output,
         "agent3_output": agent3_output,
         "agent4_output": agent4_output,
-        "status": "generated_awaiting_verification",
-        "message_to_user": _user_facing_message(agent4_output, agent3_output),
+        "agent5_records": audit_records,
+        "agent6_output": agent6_output,
+        "status": status,
+        "message_to_user": message_to_user,
+        "final_response": {
+            "answer": agent4_output.final_answer,
+            "citations": agent4_output.final_citations,
+        } if status == "answered" else None,
     }
 
 
 if __name__ == "__main__":
-    import json
-
     # Manual smoke test — run: python pipeline.py
     register_session("demo_session", UserRole.CUSTOMER)
 
@@ -146,28 +243,47 @@ if __name__ == "__main__":
     if "agent3_output" in result:
         a3 = result["agent3_output"]
         print("\n--- Agent 3 Output ---")
-        print(f"Grounded?:           {a3.grounded}")
-        print(f"Answer:              {a3.answer_text}")
-        print(f"Chunks Used:         {a3.chunks_used}")
-        print(f"Chunks Discarded:    {a3.chunks_discarded}")
-        print(f"Synthesis Notes:     {a3.synthesis_notes}")
-        print("Citations:")
-        for c in a3.citations:
-            print(f"  - [{c.doc_id}] {c.doc_title} / {c.section} (chunk={c.chunk_id})")
-    
+        print(f"Grounded?:       {a3.grounded}")
+        print(f"Citations:       {len(a3.citations)}")
+        print(f"Chunks Used:     {a3.chunks_used}")
+        print(f"Answer (draft):  {a3.answer_text}")
+
     if "agent4_output" in result:
         a4 = result["agent4_output"]
         print("\n--- Agent 4 Output ---")
-        print(f"Decision:              {a4.decision.value}")
-        print(f"Denial Reason:         {a4.denial_reason}")
-        print(f"Evidence Sufficiency:  {a4.evidence_sufficiency.value}")
-        print(f"Factual Support Check: {a4.factual_support_check.value}")
-        print(f"Version Conflict?:     {a4.version_conflict_detected}")
-        print(f"Conflict Details:      {a4.conflict_details}")
-        print(f"Access Reconfirmed?:   {a4.access_reconfirmed}")
-        print(f"Confidence:            {a4.confidence}")
-        print(f"Final Answer:          {a4.final_answer}")
-        print("Final Citations:")
-        for c in a4.final_citations:
-            print(f"  - [{c.doc_id}] {c.doc_title} / {c.section}")
+        print(f"Decision:            {a4.decision.value}")
+        print(f"Denial Reason:       {a4.denial_reason}")
+        print(f"Evidence Sufficient: {a4.evidence_sufficiency.value}")
+        print(f"Factual Check:       {a4.factual_support_check.value}")
+        print(f"Version Conflict?:   {a4.version_conflict_detected}")
+        if a4.version_conflict_detected:
+            print(f"Conflict Details:    {a4.conflict_details}")
+        print(f"Access Reconfirmed?: {a4.access_reconfirmed}")
+        print(f"Confidence:          {a4.confidence}")
+        if a4.final_answer:
+            print(f"\nFINAL ANSWER: {a4.final_answer}")
+            for c in a4.final_citations:
+                print(f"  source: {c.doc_title} ({c.section})")
+        else:
+            print(f"\nFINAL ANSWER: [withheld — {a4.decision.value}]")
+
+    if "agent5_records" in result:
+        print("\n--- Agent 5 Output (audit log) ---")
+        for rec in result["agent5_records"]:
+            print(f"[{rec.stage.value}] log_id={rec.log_id}")
+            print(f"    agent:      {rec.agent}")
+            print(f"    summary:    {rec.decision_summary}")
+            print(f"    hash:       {rec.immutable_hash}")
+            print(f"    timestamp:  {rec.timestamp}")
+
+    if "agent6_output" in result:
+        a6 = result["agent6_output"]
+        print("\n--- Agent 6 Output ---")
+        print(f"Escalation Triggered?: {a6.escalation_triggered}")
+        if a6.escalation_triggered:
+            print(f"Trigger Reason:        {a6.trigger_reason.value}")
+            print(f"Routed To:             {a6.routed_to}")
+            print(f"Priority:              {a6.priority.value}")
+            print(f"User-Facing Message:   {a6.user_facing_message}")
+
     print("------------------------\n")

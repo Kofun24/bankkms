@@ -84,4 +84,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId, message }),
     }),
+
+      staffLogin: (username, password) =>
+    publicRequest("/staff/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+
+  staffLogout: (sessionId) =>
+    publicRequest("/logout", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${sessionId}` },
+    }),
+
+  sendStaffChatMessage: (sessionId, message) =>
+    publicRequest("/chat", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId, message }),
+    }),
 };
+

@@ -1,0 +1,1602 @@
+[
+  {
+    "id": 1175,
+    "session_id": "47b1a0c8-d26d-4c41-af10-f3ea40c2ca75",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:39:33.235879+00:00"
+  },
+  {
+    "id": 1174,
+    "session_id": "47b1a0c8-d26d-4c41-af10-f3ea40c2ca75",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:39:32.670419+00:00"
+  },
+  {
+    "id": 1173,
+    "session_id": "47b1a0c8-d26d-4c41-af10-f3ea40c2ca75",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:39:32.102035+00:00"
+  },
+  {
+    "id": 1172,
+    "session_id": "47b1a0c8-d26d-4c41-af10-f3ea40c2ca75",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=procedure_lookup access_level=internal needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:39:31.548826+00:00"
+  },
+  {
+    "id": 1171,
+    "session_id": "e8fee554-300e-4a0d-af5e-fad94f3c41ea",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:39:22.368605+00:00"
+  },
+  {
+    "id": 1170,
+    "session_id": "e8fee554-300e-4a0d-af5e-fad94f3c41ea",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:39:21.817143+00:00"
+  },
+  {
+    "id": 1169,
+    "session_id": "e8fee554-300e-4a0d-af5e-fad94f3c41ea",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:39:21.166154+00:00"
+  },
+  {
+    "id": 1168,
+    "session_id": "e8fee554-300e-4a0d-af5e-fad94f3c41ea",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:39:20.610326+00:00"
+  },
+  {
+    "id": 1167,
+    "session_id": "ccff89de-09a4-490e-937c-75b18a62a6fd",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:38:25.077426+00:00"
+  },
+  {
+    "id": 1166,
+    "session_id": "ccff89de-09a4-490e-937c-75b18a62a6fd",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:38:24.520420+00:00"
+  },
+  {
+    "id": 1165,
+    "session_id": "ccff89de-09a4-490e-937c-75b18a62a6fd",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:38:23.850440+00:00"
+  },
+  {
+    "id": 1164,
+    "session_id": "ccff89de-09a4-490e-937c-75b18a62a6fd",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=restricted needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:38:23.296009+00:00"
+  },
+  {
+    "id": 1163,
+    "session_id": "4373b5dc-7c12-4bb2-8c83-a35c2b0fba39",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:37:44.186022+00:00"
+  },
+  {
+    "id": 1162,
+    "session_id": "4373b5dc-7c12-4bb2-8c83-a35c2b0fba39",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:37:43.524873+00:00"
+  },
+  {
+    "id": 1161,
+    "session_id": "4373b5dc-7c12-4bb2-8c83-a35c2b0fba39",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:37:42.862089+00:00"
+  },
+  {
+    "id": 1160,
+    "session_id": "4373b5dc-7c12-4bb2-8c83-a35c2b0fba39",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:37:42.308798+00:00"
+  },
+  {
+    "id": 1159,
+    "session_id": "fb9c98e1-12f4-4848-99f1-6f5329ac08f0",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:37:20.436360+00:00"
+  },
+  {
+    "id": 1158,
+    "session_id": "fb9c98e1-12f4-4848-99f1-6f5329ac08f0",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:37:19.879835+00:00"
+  },
+  {
+    "id": 1157,
+    "session_id": "fb9c98e1-12f4-4848-99f1-6f5329ac08f0",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:37:19.258070+00:00"
+  },
+  {
+    "id": 1156,
+    "session_id": "fb9c98e1-12f4-4848-99f1-6f5329ac08f0",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:37:18.533703+00:00"
+  },
+  {
+    "id": 1155,
+    "session_id": "b757d1a8-c275-4f70-84fd-929bcbfb880c",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:37:04.768223+00:00"
+  },
+  {
+    "id": 1154,
+    "session_id": "b757d1a8-c275-4f70-84fd-929bcbfb880c",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:37:04.213261+00:00"
+  },
+  {
+    "id": 1153,
+    "session_id": "b757d1a8-c275-4f70-84fd-929bcbfb880c",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:37:03.608575+00:00"
+  },
+  {
+    "id": 1152,
+    "session_id": "b757d1a8-c275-4f70-84fd-929bcbfb880c",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:37:03.048793+00:00"
+  },
+  {
+    "id": 1151,
+    "session_id": "18525aa9-a766-408b-9915-06b16248eb4d",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:36:52.691096+00:00"
+  },
+  {
+    "id": 1150,
+    "session_id": "18525aa9-a766-408b-9915-06b16248eb4d",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:36:52.136014+00:00"
+  },
+  {
+    "id": 1149,
+    "session_id": "18525aa9-a766-408b-9915-06b16248eb4d",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:36:51.472403+00:00"
+  },
+  {
+    "id": 1148,
+    "session_id": "18525aa9-a766-408b-9915-06b16248eb4d",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:36:50.188330+00:00"
+  },
+  {
+    "id": 1147,
+    "session_id": "e73c7e37-8bbd-4b46-829b-66253400b7e0",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:36:35.944289+00:00"
+  },
+  {
+    "id": 1146,
+    "session_id": "e73c7e37-8bbd-4b46-829b-66253400b7e0",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:36:35.389884+00:00"
+  },
+  {
+    "id": 1145,
+    "session_id": "e73c7e37-8bbd-4b46-829b-66253400b7e0",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:36:34.828674+00:00"
+  },
+  {
+    "id": 1144,
+    "session_id": "e73c7e37-8bbd-4b46-829b-66253400b7e0",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=procedure_lookup access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:36:34.266105+00:00"
+  },
+  {
+    "id": 1143,
+    "session_id": "27ecd05e-7cc9-4065-8526-44592be44219",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:36:15.711148+00:00"
+  },
+  {
+    "id": 1142,
+    "session_id": "27ecd05e-7cc9-4065-8526-44592be44219",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:36:15.154222+00:00"
+  },
+  {
+    "id": 1141,
+    "session_id": "27ecd05e-7cc9-4065-8526-44592be44219",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:36:14.593088+00:00"
+  },
+  {
+    "id": 1140,
+    "session_id": "27ecd05e-7cc9-4065-8526-44592be44219",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:36:14.035496+00:00"
+  },
+  {
+    "id": 1139,
+    "session_id": "09667e17-d347-4050-9349-3a76e3088a74",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:34:18.766503+00:00"
+  },
+  {
+    "id": 1138,
+    "session_id": "09667e17-d347-4050-9349-3a76e3088a74",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:34:18.196961+00:00"
+  },
+  {
+    "id": 1137,
+    "session_id": "09667e17-d347-4050-9349-3a76e3088a74",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:34:17.549602+00:00"
+  },
+  {
+    "id": 1136,
+    "session_id": "09667e17-d347-4050-9349-3a76e3088a74",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.89",
+    "timestamp": "2026-09-26T14:34:16.882099+00:00"
+  },
+  {
+    "id": 1135,
+    "session_id": "92ba86fd-88c7-4cd0-b0ca-0a1e0da5f83b",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:34:06.338410+00:00"
+  },
+  {
+    "id": 1134,
+    "session_id": "92ba86fd-88c7-4cd0-b0ca-0a1e0da5f83b",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:34:05.771878+00:00"
+  },
+  {
+    "id": 1133,
+    "session_id": "92ba86fd-88c7-4cd0-b0ca-0a1e0da5f83b",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:34:05.138194+00:00"
+  },
+  {
+    "id": 1132,
+    "session_id": "92ba86fd-88c7-4cd0-b0ca-0a1e0da5f83b",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:34:04.579188+00:00"
+  },
+  {
+    "id": 1131,
+    "session_id": "d0ac962a-8066-4591-a891-8e70279eabe2",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:31:51.471459+00:00"
+  },
+  {
+    "id": 1130,
+    "session_id": "d0ac962a-8066-4591-a891-8e70279eabe2",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:31:50.908870+00:00"
+  },
+  {
+    "id": 1129,
+    "session_id": "d0ac962a-8066-4591-a891-8e70279eabe2",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:31:50.278566+00:00"
+  },
+  {
+    "id": 1128,
+    "session_id": "d0ac962a-8066-4591-a891-8e70279eabe2",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:31:49.681475+00:00"
+  },
+  {
+    "id": 1127,
+    "session_id": "f228cd38-369e-4093-85c9-8f3b7068dff6",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:30:09.753489+00:00"
+  },
+  {
+    "id": 1126,
+    "session_id": "f228cd38-369e-4093-85c9-8f3b7068dff6",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:30:09.117847+00:00"
+  },
+  {
+    "id": 1125,
+    "session_id": "f228cd38-369e-4093-85c9-8f3b7068dff6",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:30:08.481301+00:00"
+  },
+  {
+    "id": 1124,
+    "session_id": "f228cd38-369e-4093-85c9-8f3b7068dff6",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:30:07.908933+00:00"
+  },
+  {
+    "id": 1123,
+    "session_id": "2fbf90be-5d08-4c2c-8ba9-99ecb052a2f0",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:28:55.480570+00:00"
+  },
+  {
+    "id": 1122,
+    "session_id": "2fbf90be-5d08-4c2c-8ba9-99ecb052a2f0",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:28:54.921745+00:00"
+  },
+  {
+    "id": 1121,
+    "session_id": "2fbf90be-5d08-4c2c-8ba9-99ecb052a2f0",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:28:54.253040+00:00"
+  },
+  {
+    "id": 1120,
+    "session_id": "2fbf90be-5d08-4c2c-8ba9-99ecb052a2f0",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:28:53.672997+00:00"
+  },
+  {
+    "id": 1119,
+    "session_id": "47b1a0c8-d26d-4c41-af10-f3ea40c2ca75",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:27:59.242155+00:00"
+  },
+  {
+    "id": 1118,
+    "session_id": "47b1a0c8-d26d-4c41-af10-f3ea40c2ca75",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:27:58.681366+00:00"
+  },
+  {
+    "id": 1117,
+    "session_id": "47b1a0c8-d26d-4c41-af10-f3ea40c2ca75",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:27:58.058895+00:00"
+  },
+  {
+    "id": 1116,
+    "session_id": "47b1a0c8-d26d-4c41-af10-f3ea40c2ca75",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=procedure_lookup access_level=internal needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:27:57.498043+00:00"
+  },
+  {
+    "id": 1115,
+    "session_id": "680c6b57-f8d1-4941-95df-6630bddd89e8",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:27:29.322250+00:00"
+  },
+  {
+    "id": 1114,
+    "session_id": "680c6b57-f8d1-4941-95df-6630bddd89e8",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:27:28.769572+00:00"
+  },
+  {
+    "id": 1113,
+    "session_id": "680c6b57-f8d1-4941-95df-6630bddd89e8",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:27:28.146243+00:00"
+  },
+  {
+    "id": 1112,
+    "session_id": "680c6b57-f8d1-4941-95df-6630bddd89e8",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:27:27.586130+00:00"
+  },
+  {
+    "id": 1111,
+    "session_id": "15eb1671-6276-4eb1-a7e5-169a8407ce60",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:27:17.434131+00:00"
+  },
+  {
+    "id": 1110,
+    "session_id": "15eb1671-6276-4eb1-a7e5-169a8407ce60",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:27:16.875710+00:00"
+  },
+  {
+    "id": 1109,
+    "session_id": "15eb1671-6276-4eb1-a7e5-169a8407ce60",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:27:16.243397+00:00"
+  },
+  {
+    "id": 1108,
+    "session_id": "15eb1671-6276-4eb1-a7e5-169a8407ce60",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:27:15.681323+00:00"
+  },
+  {
+    "id": 1107,
+    "session_id": "087d8b6c-3f2a-4f71-822d-2833b191c5d5",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:27:03.645243+00:00"
+  },
+  {
+    "id": 1106,
+    "session_id": "087d8b6c-3f2a-4f71-822d-2833b191c5d5",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:27:03.088662+00:00"
+  },
+  {
+    "id": 1105,
+    "session_id": "087d8b6c-3f2a-4f71-822d-2833b191c5d5",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:27:02.458572+00:00"
+  },
+  {
+    "id": 1104,
+    "session_id": "087d8b6c-3f2a-4f71-822d-2833b191c5d5",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:27:01.898334+00:00"
+  },
+  {
+    "id": 1103,
+    "session_id": "9f360169-9890-49cb-ab0f-22ed21909634",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:26:50.551030+00:00"
+  },
+  {
+    "id": 1102,
+    "session_id": "9f360169-9890-49cb-ab0f-22ed21909634",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:26:49.883362+00:00"
+  },
+  {
+    "id": 1101,
+    "session_id": "9f360169-9890-49cb-ab0f-22ed21909634",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:26:49.320157+00:00"
+  },
+  {
+    "id": 1100,
+    "session_id": "9f360169-9890-49cb-ab0f-22ed21909634",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:26:48.752878+00:00"
+  },
+  {
+    "id": 1099,
+    "session_id": "16ce7e82-80ec-4b33-a08d-a58ecc0558a2",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:26:36.613346+00:00"
+  },
+  {
+    "id": 1098,
+    "session_id": "16ce7e82-80ec-4b33-a08d-a58ecc0558a2",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:26:36.043959+00:00"
+  },
+  {
+    "id": 1097,
+    "session_id": "16ce7e82-80ec-4b33-a08d-a58ecc0558a2",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:26:35.408786+00:00"
+  },
+  {
+    "id": 1096,
+    "session_id": "16ce7e82-80ec-4b33-a08d-a58ecc0558a2",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.98",
+    "timestamp": "2026-09-26T14:26:34.835140+00:00"
+  },
+  {
+    "id": 1095,
+    "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:26:23.096023+00:00"
+  },
+  {
+    "id": 1094,
+    "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:26:22.541467+00:00"
+  },
+  {
+    "id": 1093,
+    "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:26:21.917422+00:00"
+  },
+  {
+    "id": 1092,
+    "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.92",
+    "timestamp": "2026-09-26T14:26:21.355435+00:00"
+  },
+  {
+    "id": 1091,
+    "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:26:09.893476+00:00"
+  },
+  {
+    "id": 1090,
+    "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:26:09.331680+00:00"
+  },
+  {
+    "id": 1089,
+    "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:26:08.613238+00:00"
+  },
+  {
+    "id": 1088,
+    "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.98",
+    "timestamp": "2026-09-26T14:26:08.052986+00:00"
+  },
+  {
+    "id": 1087,
+    "session_id": "5b208ddb-d026-4d4a-980b-121d59062cb3",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:23:00.659473+00:00"
+  },
+  {
+    "id": 1086,
+    "session_id": "5b208ddb-d026-4d4a-980b-121d59062cb3",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:23:00.101695+00:00"
+  },
+  {
+    "id": 1085,
+    "session_id": "5b208ddb-d026-4d4a-980b-121d59062cb3",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:22:59.427907+00:00"
+  },
+  {
+    "id": 1084,
+    "session_id": "5b208ddb-d026-4d4a-980b-121d59062cb3",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=fraud_report access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:22:58.869947+00:00"
+  },
+  {
+    "id": 1083,
+    "session_id": "39436185-4f85-4592-bff6-0db4877e92d8",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:22:37.829068+00:00"
+  },
+  {
+    "id": 1082,
+    "session_id": "39436185-4f85-4592-bff6-0db4877e92d8",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:22:37.270659+00:00"
+  },
+  {
+    "id": 1081,
+    "session_id": "39436185-4f85-4592-bff6-0db4877e92d8",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:22:36.679339+00:00"
+  },
+  {
+    "id": 1080,
+    "session_id": "39436185-4f85-4592-bff6-0db4877e92d8",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=other access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:22:36.119285+00:00"
+  },
+  {
+    "id": 1079,
+    "session_id": "664cd121-87c2-4a59-8677-242637e0b19e",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:22:16.840420+00:00"
+  },
+  {
+    "id": 1078,
+    "session_id": "664cd121-87c2-4a59-8677-242637e0b19e",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:22:16.277966+00:00"
+  },
+  {
+    "id": 1077,
+    "session_id": "664cd121-87c2-4a59-8677-242637e0b19e",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:22:15.603137+00:00"
+  },
+  {
+    "id": 1076,
+    "session_id": "664cd121-87c2-4a59-8677-242637e0b19e",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=other access_level=public needs_clarification=False confidence=0.99",
+    "timestamp": "2026-09-26T14:22:15.046461+00:00"
+  },
+  {
+    "id": 1075,
+    "session_id": "8f3ef133-9e81-4747-a530-96afe6478a41",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:22:04.927097+00:00"
+  },
+  {
+    "id": 1074,
+    "session_id": "8f3ef133-9e81-4747-a530-96afe6478a41",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:22:04.368916+00:00"
+  },
+  {
+    "id": 1073,
+    "session_id": "8f3ef133-9e81-4747-a530-96afe6478a41",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:22:03.665493+00:00"
+  },
+  {
+    "id": 1072,
+    "session_id": "8f3ef133-9e81-4747-a530-96afe6478a41",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=other access_level=public needs_clarification=False confidence=0.99",
+    "timestamp": "2026-09-26T14:22:03.099170+00:00"
+  },
+  {
+    "id": 1071,
+    "session_id": "2ba69505-172c-4816-b67b-4ba5ce2b3a19",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:21:52.557370+00:00"
+  },
+  {
+    "id": 1070,
+    "session_id": "2ba69505-172c-4816-b67b-4ba5ce2b3a19",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:21:52.003219+00:00"
+  },
+  {
+    "id": 1069,
+    "session_id": "2ba69505-172c-4816-b67b-4ba5ce2b3a19",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:21:51.351166+00:00"
+  },
+  {
+    "id": 1068,
+    "session_id": "2ba69505-172c-4816-b67b-4ba5ce2b3a19",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=other access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:21:50.788896+00:00"
+  },
+  {
+    "id": 1067,
+    "session_id": "7fbb391d-6caa-4054-b6d4-161213f9602c",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:21:30.901257+00:00"
+  },
+  {
+    "id": 1066,
+    "session_id": "7fbb391d-6caa-4054-b6d4-161213f9602c",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:21:30.106617+00:00"
+  },
+  {
+    "id": 1065,
+    "session_id": "7fbb391d-6caa-4054-b6d4-161213f9602c",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:21:29.455612+00:00"
+  },
+  {
+    "id": 1064,
+    "session_id": "7fbb391d-6caa-4054-b6d4-161213f9602c",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=internal needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:21:28.896939+00:00"
+  },
+  {
+    "id": 1063,
+    "session_id": "3783110a-e67a-4304-bf8b-17694b462433",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:20:36.539465+00:00"
+  },
+  {
+    "id": 1062,
+    "session_id": "3783110a-e67a-4304-bf8b-17694b462433",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:20:35.978654+00:00"
+  },
+  {
+    "id": 1061,
+    "session_id": "3783110a-e67a-4304-bf8b-17694b462433",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:20:35.418222+00:00"
+  },
+  {
+    "id": 1060,
+    "session_id": "3783110a-e67a-4304-bf8b-17694b462433",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.85",
+    "timestamp": "2026-09-26T14:20:34.859053+00:00"
+  },
+  {
+    "id": 1059,
+    "session_id": "ca28fb87-8231-49c6-b9ea-a97e57f20685",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:20:24.729596+00:00"
+  },
+  {
+    "id": 1058,
+    "session_id": "ca28fb87-8231-49c6-b9ea-a97e57f20685",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:20:24.158872+00:00"
+  },
+  {
+    "id": 1057,
+    "session_id": "ca28fb87-8231-49c6-b9ea-a97e57f20685",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:20:23.541184+00:00"
+  },
+  {
+    "id": 1056,
+    "session_id": "ca28fb87-8231-49c6-b9ea-a97e57f20685",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.98",
+    "timestamp": "2026-09-26T14:20:22.982933+00:00"
+  },
+  {
+    "id": 1055,
+    "session_id": "3e4fac9f-2d5d-4aef-bea0-8f4fe9615e62",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:20:12.902137+00:00"
+  },
+  {
+    "id": 1054,
+    "session_id": "3e4fac9f-2d5d-4aef-bea0-8f4fe9615e62",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:20:12.346579+00:00"
+  },
+  {
+    "id": 1053,
+    "session_id": "3e4fac9f-2d5d-4aef-bea0-8f4fe9615e62",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:20:11.675908+00:00"
+  },
+  {
+    "id": 1052,
+    "session_id": "3e4fac9f-2d5d-4aef-bea0-8f4fe9615e62",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=other access_level=public needs_clarification=False confidence=0.99",
+    "timestamp": "2026-09-26T14:20:11.120604+00:00"
+  },
+  {
+    "id": 1051,
+    "session_id": "2197f214-2463-4c05-8e4f-8956d3907233",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:20:01.167315+00:00"
+  },
+  {
+    "id": 1050,
+    "session_id": "2197f214-2463-4c05-8e4f-8956d3907233",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:20:00.609870+00:00"
+  },
+  {
+    "id": 1049,
+    "session_id": "2197f214-2463-4c05-8e4f-8956d3907233",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:20:00.053585+00:00"
+  },
+  {
+    "id": 1048,
+    "session_id": "2197f214-2463-4c05-8e4f-8956d3907233",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=other access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:19:59.499252+00:00"
+  },
+  {
+    "id": 1047,
+    "session_id": "0c775d67-fc68-4a04-88fb-996c33d3c91b",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:19:49.219584+00:00"
+  },
+  {
+    "id": 1046,
+    "session_id": "0c775d67-fc68-4a04-88fb-996c33d3c91b",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:19:48.659037+00:00"
+  },
+  {
+    "id": 1045,
+    "session_id": "0c775d67-fc68-4a04-88fb-996c33d3c91b",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:19:48.037463+00:00"
+  },
+  {
+    "id": 1044,
+    "session_id": "0c775d67-fc68-4a04-88fb-996c33d3c91b",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=other access_level=public needs_clarification=False confidence=0.99",
+    "timestamp": "2026-09-26T14:19:47.473455+00:00"
+  },
+  {
+    "id": 1043,
+    "session_id": "4754a794-86db-47ee-ad71-9de0b8f93de1",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:19:37.639142+00:00"
+  },
+  {
+    "id": 1042,
+    "session_id": "4754a794-86db-47ee-ad71-9de0b8f93de1",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:19:37.084091+00:00"
+  },
+  {
+    "id": 1041,
+    "session_id": "4754a794-86db-47ee-ad71-9de0b8f93de1",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:19:36.481663+00:00"
+  },
+  {
+    "id": 1040,
+    "session_id": "4754a794-86db-47ee-ad71-9de0b8f93de1",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=other access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:19:35.925393+00:00"
+  },
+  {
+    "id": 1039,
+    "session_id": "4754a794-86db-47ee-ad71-9de0b8f93de1",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:19:28.497402+00:00"
+  },
+  {
+    "id": 1038,
+    "session_id": "4754a794-86db-47ee-ad71-9de0b8f93de1",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:19:27.935011+00:00"
+  },
+  {
+    "id": 1037,
+    "session_id": "4754a794-86db-47ee-ad71-9de0b8f93de1",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:19:27.379075+00:00"
+  },
+  {
+    "id": 1036,
+    "session_id": "4754a794-86db-47ee-ad71-9de0b8f93de1",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=other access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:19:26.814959+00:00"
+  },
+  {
+    "id": 1035,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:16:27.321277+00:00"
+  },
+  {
+    "id": 1034,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:16:26.757059+00:00"
+  },
+  {
+    "id": 1033,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:16:26.101125+00:00"
+  },
+  {
+    "id": 1032,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:16:25.542068+00:00"
+  },
+  {
+    "id": 1031,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:15:01.818787+00:00"
+  },
+  {
+    "id": 1030,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:15:01.261375+00:00"
+  },
+  {
+    "id": 1029,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:15:00.626863+00:00"
+  },
+  {
+    "id": 1028,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:15:00.067068+00:00"
+  },
+  {
+    "id": 1027,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=escalated reason=factual_check_failed: the answer could not be fully verified against its cited sources confidence=1.0",
+    "timestamp": "2026-09-26T14:14:46.034308+00:00"
+  },
+  {
+    "id": 1026,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:14:45.368783+00:00"
+  },
+  {
+    "id": 1025,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:14:44.735157+00:00"
+  },
+  {
+    "id": 1024,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.98",
+    "timestamp": "2026-09-26T14:14:44.170206+00:00"
+  },
+  {
+    "id": 1023,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:14:34.690335+00:00"
+  },
+  {
+    "id": 1022,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:14:34.124876+00:00"
+  },
+  {
+    "id": 1021,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:14:33.492256+00:00"
+  },
+  {
+    "id": 1020,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:14:32.926956+00:00"
+  },
+  {
+    "id": 1019,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:14:24.242967+00:00"
+  },
+  {
+    "id": 1018,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:14:23.683474+00:00"
+  },
+  {
+    "id": 1017,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:14:23.008260+00:00"
+  },
+  {
+    "id": 1016,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.92",
+    "timestamp": "2026-09-26T14:14:22.448894+00:00"
+  },
+  {
+    "id": 1015,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:14:14.147938+00:00"
+  },
+  {
+    "id": 1014,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:14:13.590270+00:00"
+  },
+  {
+    "id": 1013,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:14:12.917283+00:00"
+  },
+  {
+    "id": 1012,
+    "session_id": "563e6cfa-7c9c-42ff-937e-b15a35e353e7",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.98",
+    "timestamp": "2026-09-26T14:14:12.355471+00:00"
+  },
+  {
+    "id": 1011,
+    "session_id": "81ecd28e-8483-4d69-8345-ceacfd192b7b",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:03:41.301972+00:00"
+  },
+  {
+    "id": 1010,
+    "session_id": "81ecd28e-8483-4d69-8345-ceacfd192b7b",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:03:40.744968+00:00"
+  },
+  {
+    "id": 1009,
+    "session_id": "81ecd28e-8483-4d69-8345-ceacfd192b7b",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:03:40.047927+00:00"
+  },
+  {
+    "id": 1008,
+    "session_id": "81ecd28e-8483-4d69-8345-ceacfd192b7b",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=procedure_lookup access_level=internal needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:03:39.474860+00:00"
+  },
+  {
+    "id": 1007,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:01:23.743507+00:00"
+  },
+  {
+    "id": 1006,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:01:23.178879+00:00"
+  },
+  {
+    "id": 1005,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:01:22.485651+00:00"
+  },
+  {
+    "id": 1004,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:01:21.916916+00:00"
+  },
+  {
+    "id": 1003,
+    "session_id": "3435b166-f7cd-4c5e-8333-c804293894e0",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:01:09.721308+00:00"
+  },
+  {
+    "id": 1002,
+    "session_id": "3435b166-f7cd-4c5e-8333-c804293894e0",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:01:09.155813+00:00"
+  },
+  {
+    "id": 1001,
+    "session_id": "3435b166-f7cd-4c5e-8333-c804293894e0",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:01:08.508373+00:00"
+  },
+  {
+    "id": 1000,
+    "session_id": "3435b166-f7cd-4c5e-8333-c804293894e0",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=restricted needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:01:07.950294+00:00"
+  },
+  {
+    "id": 999,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:00:37.713024+00:00"
+  },
+  {
+    "id": 998,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:00:37.152977+00:00"
+  },
+  {
+    "id": 997,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T14:00:36.522745+00:00"
+  },
+  {
+    "id": 996,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:00:35.907885+00:00"
+  },
+  {
+    "id": 995,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T14:00:23.843110+00:00"
+  },
+  {
+    "id": 994,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T14:00:23.278511+00:00"
+  },
+  {
+    "id": 993,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:00:22.589453+00:00"
+  },
+  {
+    "id": 992,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:00:22.009495+00:00"
+  },
+  {
+    "id": 991,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T14:00:10.650359+00:00"
+  },
+  {
+    "id": 990,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T14:00:10.083379+00:00"
+  },
+  {
+    "id": 989,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T14:00:09.451293+00:00"
+  },
+  {
+    "id": 988,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T14:00:08.751076+00:00"
+  },
+  {
+    "id": 987,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=denied reason=insufficient_evidence: no grounded, cited content available confidence=0.0",
+    "timestamp": "2026-09-26T13:59:56.615604+00:00"
+  },
+  {
+    "id": 986,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=False citations=0 chunks_used=0",
+    "timestamp": "2026-09-26T13:59:56.058222+00:00"
+  },
+  {
+    "id": 985,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=low reformulated=True attempts=2",
+    "timestamp": "2026-09-26T13:59:55.432632+00:00"
+  },
+  {
+    "id": 984,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=policy_check access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T13:59:54.879105+00:00"
+  },
+  {
+    "id": 983,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T13:59:46.126861+00:00"
+  },
+  {
+    "id": 982,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T13:59:45.523784+00:00"
+  },
+  {
+    "id": 981,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=True attempts=2",
+    "timestamp": "2026-09-26T13:59:44.921638+00:00"
+  },
+  {
+    "id": 980,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=procedure_lookup access_level=public needs_clarification=False confidence=0.98",
+    "timestamp": "2026-09-26T13:59:44.361532+00:00"
+  },
+  {
+    "id": 979,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "verification",
+    "agent": "agent4_verification",
+    "decision_summary": "decision=approved reason=n/a confidence=1.0",
+    "timestamp": "2026-09-26T13:59:33.120396+00:00"
+  },
+  {
+    "id": 978,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "generation",
+    "agent": "agent3_response",
+    "decision_summary": "grounded=True citations=1 chunks_used=1",
+    "timestamp": "2026-09-26T13:59:32.562847+00:00"
+  },
+  {
+    "id": 977,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "retrieval",
+    "agent": "agent2_retrieval",
+    "decision_summary": "results=5 confidence=medium reformulated=False attempts=1",
+    "timestamp": "2026-09-26T13:59:31.912588+00:00"
+  },
+  {
+    "id": 976,
+    "session_id": "30dc6a82-e16c-44c4-bca0-12e87d215dab",
+    "stage": "classification",
+    "agent": "agent1_classification",
+    "decision_summary": "intent=account_info access_level=public needs_clarification=False confidence=0.95",
+    "timestamp": "2026-09-26T13:59:31.359200+00:00"
+  }
+]
