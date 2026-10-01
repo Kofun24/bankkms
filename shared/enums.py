@@ -51,6 +51,7 @@ class LogStage(str, Enum):
     RETRIEVAL = "retrieval"
     GENERATION = "generation"
     VERIFICATION = "verification"
+    ESCALATION = "escalation"
 
 
 class EscalationReason(str, Enum):

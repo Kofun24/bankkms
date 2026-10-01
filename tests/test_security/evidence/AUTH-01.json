@@ -1,0 +1,21 @@
+{
+  "test_id": "AUTH-01",
+  "timestamp_utc": "2026-09-26T14:39:33.921235+00:00",
+  "category": "Authentication Binding / Session Handling",
+  "role": "staff",
+  "objective": "Prove /chat grants role-based access from session_id alone, with no Authorization header ever sent",
+  "message": "What are the steps in the Account Opening Procedure regarding risk rating assignment?",
+  "result": {
+    "http_status": 200,
+    "request_body": {
+      "session_id": "47b1a0c8-d26d-4c41-af10-f3ea40c2ca75",
+      "message": "What are the steps in the Account Opening Procedure regarding risk rating assignment?"
+    },
+    "request_had_authorization_header": false,
+    "response_body": {
+      "status": "answered",
+      "message_to_user": "Every new customer is assigned a risk rating of low, medium, or high using the internal risk scoring sheet, which is based on their occupation, source of funds, and expected transaction volume.",
+      "needs_clarification": false
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "test_id": "DIAG-0a",
+  "timestamp_utc": "2026-09-26T14:26:10.612945+00:00",
+  "category": "Diagnostic",
+  "role": "customer",
+  "objective": "Establish a real answer in turn 1",
+  "message": "What is the minimum balance for a savings account?",
+  "result": {
+    "http_status": 200,
+    "request_body": {
+      "session_id": "d4a8335c-51be-49fe-9de6-edcdaf47ba25",
+      "message": "What is the minimum balance for a savings account?"
+    },
+    "request_had_authorization_header": false,
+    "response_body": {
+      "status": "answered",
+      "message_to_user": "The minimum balance required to maintain a personal savings account is LKR 1,000.",
+      "needs_clarification": false
+    }
+  }
+}
