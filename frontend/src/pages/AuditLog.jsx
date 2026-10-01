@@ -5,28 +5,41 @@ export default function AuditLog() {
   const [logs, setLogs] = useState([]);
   const [chainStatus, setChainStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState("");
 
-  async function load() {
-    setLoading(true);
+  useEffect(() => {
+    let ignore = false;
+    Promise.all([api.getAuditLog(60), api.verifyAuditChain()])
+      .then(([logData, verifyData]) => {
+        if (!ignore) {
+          setLogs(logData);
+          setChainStatus(verifyData);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          setError(err.message || "Failed to load audit records.");
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  async function handleVerifyChain() {
+    setVerifying(true);
     try {
-      const [logData, verifyData] = await Promise.all([
-        api.getAuditLog(50),
-        api.verifyAuditChain(),
-      ]);
-      setLogs(logData);
+      const verifyData = await api.verifyAuditChain();
       setChainStatus(verifyData);
-      setError("");
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Cryptographic verification check failed.");
     } finally {
-      setLoading(false);
+      setVerifying(false);
     }
   }
-
-  useEffect(() => {
-    load();
-  }, []);
 
   const stageCounts = logs.reduce((acc, log) => {
     acc[log.stage] = (acc[log.stage] || 0) + 1;
@@ -34,117 +47,169 @@ export default function AuditLog() {
   }, {});
 
   return (
-    <div>
-      <div className="page-heading">
+    <div className="bk-admin-page">
+      <div className="bk-page-header">
         <div>
-          <span className="eyebrow">SECURITY & GOVERNANCE</span>
-          <h1>Audit log</h1>
-          <p>A tamper-evident record of activity across BankKMS.</p>
+          <span className="bk-section-tag">Regulatory Compliance</span>
+          <h1 className="bk-page-title">Tamper-Evident Audit Ledger</h1>
+          <p className="bk-page-desc">
+            Immutable, SHA-256 hash-chained log recording every pipeline classification, retrieval,
+            synthesis, and verification event.
+          </p>
         </div>
-        {chainStatus && (
-          <div className="audit-status">
-            <span>●</span>
-            {chainStatus.intact ? "Chain intact" : "Tampering detected"}
-          </div>
-        )}
+
+        <div className="bk-chain-control-group">
+          {chainStatus && (
+            <div
+              className={`bk-chain-status-indicator ${
+                chainStatus.intact ? "intact" : "compromised"
+              }`}
+            >
+              <span className="bk-chain-status-dot"></span>
+              <span className="bk-chain-status-label">
+                {chainStatus.intact ? "Hash Chain Intact" : "Chain Integrity Breach"}
+              </span>
+            </div>
+          )}
+          <button
+            type="button"
+            className="bk-btn-secondary"
+            onClick={handleVerifyChain}
+            disabled={verifying}
+          >
+            {verifying ? "Verifying SHA-256 Chain…" : "Verify Chain Now"}
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div className="login-error">
-          <span>!</span>
-          {error}
+        <div className="bk-alert-banner" role="alert">
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="audit-summary">
-        <div>
-          <span>TOTAL EVENTS</span>
-          <strong>{logs.length}</strong>
+      {/* Stage Distribution Counters */}
+      <section className="bk-audit-stats-grid" aria-label="Event Distribution">
+        <div className="bk-audit-stat-card">
+          <span className="bk-audit-stat-label">Total Logged Records</span>
+          <span className="bk-audit-stat-val tabular-nums">{logs.length}</span>
         </div>
-        <div>
-          <span>CLASSIFICATIONS</span>
-          <strong>{stageCounts.classification || 0}</strong>
+        <div className="bk-audit-stat-card">
+          <span className="bk-audit-stat-label">Agent 1: Classification</span>
+          <span className="bk-audit-stat-val tabular-nums">
+            {stageCounts.classification || 0}
+          </span>
         </div>
-        <div>
-          <span>RETRIEVALS</span>
-          <strong>{stageCounts.retrieval || 0}</strong>
+        <div className="bk-audit-stat-card">
+          <span className="bk-audit-stat-label">Agent 2: Retrieval</span>
+          <span className="bk-audit-stat-val tabular-nums">
+            {stageCounts.retrieval || 0}
+          </span>
         </div>
-        <div>
-          <span>VERIFICATIONS</span>
-          <strong>{stageCounts.verification || 0}</strong>
+        <div className="bk-audit-stat-card">
+          <span className="bk-audit-stat-label">Agent 3: Synthesis</span>
+          <span className="bk-audit-stat-val tabular-nums">
+            {stageCounts.generation || 0}
+          </span>
         </div>
-      </div>
+        <div className="bk-audit-stat-card">
+          <span className="bk-audit-stat-label">Agent 4: Verification</span>
+          <span className="bk-audit-stat-val tabular-nums">
+            {stageCounts.verification || 0}
+          </span>
+        </div>
+      </section>
 
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>TIMESTAMP</th>
-              <th>SESSION</th>
-              <th>STAGE</th>
-              <th>AGENT</th>
-              <th>SUMMARY</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!loading &&
-              logs.map((log) => (
-                <tr key={log.id}>
-                  <td className="timestamp">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </td>
-                  <td className="muted-cell">{log.session_id.slice(0, 12)}…</td>
-                  <td>
-                    <span
-                      className="role-badge employee"
-                      style={{ textTransform: "capitalize" }}
-                    >
-                      {log.stage}
-                    </span>
-                  </td>
-                  <td className="muted-cell">{log.agent}</td>
-                  <td>{log.decision_summary}</td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-        {loading && <p style={{ padding: 20 }}>Loading...</p>}
-        {!loading && logs.length === 0 && (
-          <p style={{ padding: 20, color: "var(--muted)" }}>
-            No audit records yet.
-          </p>
-        )}
-      </div>
+      {/* Audit Chain Table */}
+      <section className="bk-table-card">
+        <div className="bk-table-container">
+          <table className="bk-data-table">
+            <thead>
+              <tr>
+                <th scope="col">Timestamp</th>
+                <th scope="col">Pipeline Stage</th>
+                <th scope="col">Agent Responsible</th>
+                <th scope="col">Decision Summary</th>
+                <th scope="col">Session Token</th>
+                <th scope="col">Cryptographic Hash</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!loading &&
+                logs.map((log) => (
+                  <tr key={log.id}>
+                    <td>
+                      <span className="bk-date-text tabular-nums">
+                        {new Date(log.timestamp).toLocaleString("en-GB", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                          day: "2-digit",
+                          month: "short",
+                        })}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="bk-stage-pill">{log.stage.replace("_", " ")}</span>
+                    </td>
+                    <td>
+                      <span className="bk-agent-name">{log.agent}</span>
+                    </td>
+                    <td>
+                      <div className="bk-log-summary">{log.decision_summary}</div>
+                    </td>
+                    <td>
+                      <code className="bk-token-mono tabular-nums">
+                        {log.session_id ? log.session_id.slice(0, 8) + "…" : "—"}
+                      </code>
+                    </td>
+                    <td>
+                      <code className="bk-hash-mono tabular-nums" title={log.immutable_hash}>
+                        {log.immutable_hash ? log.immutable_hash.slice(0, 14) + "…" : "—"}
+                      </code>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
 
+          {loading && (
+            <div className="bk-table-loading">
+              <span>Reading cryptographic ledger blocks…</span>
+            </div>
+          )}
+
+          {!loading && logs.length === 0 && (
+            <div className="bk-empty-table-state">
+              <h3>Audit Ledger Empty</h3>
+              <p>No transactions have been recorded in the persistent audit database yet.</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Integrity Assessment Callout */}
       {chainStatus && (
-        <div
-          className="audit-integrity"
-          style={
-            !chainStatus.intact
-              ? { background: "var(--red-light)", borderColor: "#d9b8b3" }
-              : {}
-          }
+        <section
+          className={`bk-chain-integrity-panel ${
+            chainStatus.intact ? "intact" : "compromised"
+          }`}
         >
-          <div
-            className="integrity-icon"
-            style={!chainStatus.intact ? { background: "var(--red)" } : {}}
-          >
-            {chainStatus.intact ? "✓" : "!"}
-          </div>
-          <div>
-            <span className="eyebrow">LOG INTEGRITY</span>
+          <div className="bk-integrity-header">
             <h3>
               {chainStatus.intact
-                ? "Audit records are protected from modification."
-                : "Tampering has been detected in the audit chain."}
+                ? "Cryptographic Verification Confirmed: Ledger Unmodified"
+                : "Cryptographic Verification Alert: Chain Modification Detected"}
             </h3>
-            <p>
-              {chainStatus.intact
-                ? "Every event is hash-chained, timestamped, and recorded for accountability and regulatory review."
-                : `${chainStatus.broken_records.length} record(s) show signs of tampering. Review immediately.`}
-            </p>
           </div>
-        </div>
+          <p className="bk-integrity-desc">
+            {chainStatus.intact
+              ? "Every pipeline record contains a SHA-256 payload digest combined with the previous record's hash. The entire chain validates without any missing or re-ordered blocks."
+              : `Integrity check failed: ${
+                  chainStatus.broken_records?.length || "One or more"
+                } record(s) violate sequential hash continuity. Immediate security audit required.`}
+          </p>
+        </section>
       )}
     </div>
   );

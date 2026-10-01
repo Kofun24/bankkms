@@ -6,214 +6,228 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [statsData, docsData] = await Promise.all([
-          api.getDashboardStats(),
-          api.listDocuments(false),
-        ]);
-        setStats(statsData);
-        setDocuments(docsData.slice(0, 4));
-      } catch (err) {
-        setError(err.message);
-      }
+    let ignore = false;
+    Promise.all([api.getDashboardStats(), api.listDocuments(false)])
+      .then(([statsData, docsData]) => {
+        if (!ignore) {
+          setStats(statsData);
+          setDocuments(docsData.slice(0, 5));
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          setError(err.message || "Failed to load dashboard statistics.");
+          setLoading(false);
+        }
+      });
 
-      try {
-        const logData = await api.getAuditLog(4);
-        setAuditLog(logData);
-      } catch {
-        setAuditLog([]);
-      }
-    }
-    load();
+    api
+      .getAuditLog(5)
+      .then((logData) => {
+        if (!ignore) setAuditLog(logData);
+      })
+      .catch(() => {
+        if (!ignore) setAuditLog([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const today = new Date().toLocaleDateString("en-GB", {
     weekday: "long",
-    day: "2-digit",
+    day: "numeric",
     month: "long",
     year: "numeric",
   });
-  const [weekday, ...rest] = today.split(" ");
 
   return (
-    <div>
-      <div className="page-heading">
+    <div className="bk-admin-page">
+      {/* Header bar */}
+      <div className="bk-page-header">
         <div>
-          <span className="eyebrow">OVERVIEW</span>
-          <h1>Operations overview</h1>
-          <p>Monitor your institutional knowledge environment.</p>
+          <span className="bk-section-tag">Governance Overview</span>
+          <h1 className="bk-page-title">Operations &amp; System Health</h1>
+          <p className="bk-page-desc">
+            Operational status of BankKMS accounts, knowledge documents, and verification integrity.
+          </p>
         </div>
-        <div className="date-display">
-          <span>{weekday.toUpperCase().replace(",", "")}</span>
-          <strong>{rest.join(" ").toUpperCase()}</strong>
+        <div className="bk-date-badge tabular-nums">
+          <span className="bk-date-label">Audit Cycle Date</span>
+          <span className="bk-date-value">{today}</span>
         </div>
       </div>
 
       {error && (
-        <div className="login-error">
-          <span>!</span>
-          {error}
+        <div className="bk-alert-banner" role="alert">
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="stat-grid">
-        <div className="stat-card">
-          <div className="stat-top">
-            <span>USERS</span>
-            <span className="stat-symbol">♙</span>
+      {/* Primary Metrics Grid */}
+      <section className="bk-metrics-grid" aria-label="System Metrics">
+        <div className="bk-metric-card">
+          <div className="bk-metric-meta">
+            <span className="bk-metric-label">Registered Accounts</span>
+            <span className="bk-metric-tag">Identity</span>
           </div>
-          <div className="stat-number">
-            {stats ? stats.total_employees : "—"}
+          <div className="bk-metric-value tabular-nums">
+            {stats ? stats.total_employees : loading ? "…" : "0"}
           </div>
-          <div className="stat-description">
-            Employee, compliance & admin accounts
-          </div>
+          <p className="bk-metric-sub">Employee, Compliance &amp; Admin accounts</p>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-top">
-            <span>ACTIVE</span>
-            <span className="stat-symbol">✓</span>
+        <div className="bk-metric-card">
+          <div className="bk-metric-meta">
+            <span className="bk-metric-label">Active Users</span>
+            <span className="bk-metric-tag">Authorization</span>
           </div>
-          <div className="stat-number">
-            {stats ? stats.active_employees : "—"}
+          <div className="bk-metric-value tabular-nums">
+            {stats ? stats.active_employees : loading ? "…" : "0"}
           </div>
-          <div className="stat-description">
+          <p className="bk-metric-sub">
             {stats && stats.total_employees > 0
-              ? `${Math.round((stats.active_employees / stats.total_employees) * 100)}% of all users`
-              : "of all users"}
-          </div>
+              ? `${Math.round((stats.active_employees / stats.total_employees) * 100)}% active account ratio`
+              : "Active session authorization"}
+          </p>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-top">
-            <span>DOCUMENTS</span>
-            <span className="stat-symbol">▤</span>
+        <div className="bk-metric-card">
+          <div className="bk-metric-meta">
+            <span className="bk-metric-label">Approved Documents</span>
+            <span className="bk-metric-tag">Knowledge</span>
           </div>
-          <div className="stat-number">
-            {stats ? stats.total_documents : "—"}
+          <div className="bk-metric-value tabular-nums">
+            {stats ? stats.total_documents : loading ? "…" : "0"}
           </div>
-          <div className="stat-description">Approved knowledge sources</div>
+          <p className="bk-metric-sub">Approved policies in knowledge base</p>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-top">
-            <span>RESTRICTED</span>
-            <span className="stat-symbol">◈</span>
+        <div className="bk-metric-card">
+          <div className="bk-metric-meta">
+            <span className="bk-metric-label">Restricted Policies</span>
+            <span className="bk-metric-tag">Compliance Tier</span>
           </div>
-          <div className="stat-number">
-            {stats ? stats.restricted_documents : "—"}
+          <div className="bk-metric-value tabular-nums">
+            {stats ? stats.restricted_documents : loading ? "…" : "0"}
           </div>
-          <div className="stat-description">Compliance documents</div>
+          <p className="bk-metric-sub">Confidential AML and audit documents</p>
         </div>
-      </div>
+      </section>
 
-      <div className="dashboard-grid">
-        <section className="panel">
-          <div className="panel-header">
+      {/* Split Activity & Knowledge Panes */}
+      <div className="bk-admin-grid-2">
+        {/* Document Registry Quick Look */}
+        <section className="bk-panel">
+          <div className="bk-panel-header">
             <div>
-              <span className="eyebrow">KNOWLEDGE BASE</span>
-              <h2>Document registry</h2>
+              <h2 className="bk-panel-title">Document Registry Preview</h2>
+              <span className="bk-panel-sub">Recent policies active in knowledge retrieval</span>
             </div>
-            <Link to="/admin/documents" className="text-link">
-              View all →
+            <Link to="/admin/documents" className="bk-link-subtle">
+              Manage All Documents
             </Link>
           </div>
 
-          <div className="document-list">
-            {documents.map((doc) => (
-              <DocumentRow
-                key={doc.id}
-                name={doc.title}
-                version={doc.version}
-                access={doc.access_level.toUpperCase()}
-                status={doc.is_current ? "CURRENT" : "RETIRED"}
-              />
-            ))}
-            {documents.length === 0 && (
-              <p style={{ padding: 20, color: "var(--muted)", fontSize: 12 }}>
-                No documents yet.
-              </p>
+          <div className="bk-panel-body">
+            {documents.length > 0 ? (
+              <div className="bk-dense-list">
+                {documents.map((doc) => (
+                  <div key={doc.id} className="bk-dense-row">
+                    <div className="bk-dense-col-main">
+                      <strong className="bk-doc-title">{doc.title}</strong>
+                      <span className="bk-doc-version tabular-nums">Version: {doc.version}</span>
+                    </div>
+                    <div className="bk-dense-col-badges">
+                      <span className={`bk-tier-pill ${doc.access_level.toLowerCase()}`}>
+                        {doc.access_level}
+                      </span>
+                      <span
+                        className={`bk-status-indicator-tag ${
+                          doc.is_current ? "current" : "retired"
+                        }`}
+                      >
+                        {doc.is_current ? "Current" : "Retired"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bk-empty-state-compact">
+                <p>No documents registered yet in the system database.</p>
+                <Link to="/admin/documents" className="bk-btn-secondary">
+                  Register First Document
+                </Link>
+              </div>
             )}
           </div>
         </section>
 
-        <section className="panel activity-panel">
-          <div className="panel-header">
+        {/* Audit Chain Event Highlights */}
+        <section className="bk-panel">
+          <div className="bk-panel-header">
             <div>
-              <span className="eyebrow">SYSTEM ACTIVITY</span>
-              <h2>Recent events</h2>
+              <h2 className="bk-panel-title">Recent Audit Log Transactions</h2>
+              <span className="bk-panel-sub">Cryptographically hashed verification events</span>
             </div>
-            <Link to="/admin/audit" className="text-link">
-              Audit log →
+            <Link to="/admin/audit" className="bk-link-subtle">
+              Inspect Audit Log
             </Link>
           </div>
 
-          <div className="activity-list">
-            {auditLog.map((entry) => (
-              <Activity
-                key={entry.id}
-                title={entry.stage.replace("_", " ")}
-                detail={entry.decision_summary}
-                time={new Date(entry.timestamp).toLocaleString()}
-              />
-            ))}
-            {auditLog.length === 0 && (
-              <p style={{ padding: 20, color: "var(--muted)", fontSize: 12 }}>
-                No activity recorded yet.
-              </p>
+          <div className="bk-panel-body">
+            {auditLog.length > 0 ? (
+              <div className="bk-audit-event-list">
+                {auditLog.map((entry) => (
+                  <div key={entry.id} className="bk-audit-event-item">
+                    <div className="bk-event-header">
+                      <span className="bk-stage-tag">{entry.stage.replace("_", " ")}</span>
+                      <time className="bk-event-time tabular-nums">
+                        {new Date(entry.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
+                      </time>
+                    </div>
+                    <div className="bk-event-summary">{entry.decision_summary}</div>
+                    <div className="bk-event-hash-row">
+                      <span className="bk-hash-label">Hash:</span>
+                      <span className="bk-hash-value tabular-nums">
+                        {entry.immutable_hash ? entry.immutable_hash.slice(0, 16) + "…" : "—"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bk-empty-state-compact">
+                <p>No audit records recorded in the current session log.</p>
+              </div>
             )}
           </div>
         </section>
       </div>
 
-      <section className="principle-section">
-        <div className="principle-number">01</div>
-        <div>
-          <span className="eyebrow">BANKKMS PRINCIPLE</span>
-          <h2>
-            Every answer begins with
-            <em> approved knowledge.</em>
-          </h2>
+      {/* Core Architectural Principle Banner */}
+      <section className="bk-governance-summary-banner">
+        <div className="bk-gov-banner-badge">Core System Axiom</div>
+        <div className="bk-gov-banner-body">
+          <h3>Every answer is grounded in an approved source document or refused.</h3>
           <p>
-            Documents determine what the system knows. Access levels determine
-            who can see it. Administrators control both.
+            BankKMS does not generate speculative knowledge. Access is verified twice (at initial
+            vector retrieval and final response verification), and every system decision is sealed
+            in the immutable hash chain.
           </p>
         </div>
       </section>
-    </div>
-  );
-}
-
-function DocumentRow({ name, version, access, status }) {
-  return (
-    <div className="document-row">
-      <div className="document-icon">▤</div>
-      <div className="document-main">
-        <strong>{name}</strong>
-        <span>{version}</span>
-      </div>
-      <span className={`access-badge ${access.toLowerCase()}`}>{access}</span>
-      <span className={`status ${status.toLowerCase()}`}>
-        {status === "CURRENT" ? "●" : "○"} {status}
-      </span>
-    </div>
-  );
-}
-
-function Activity({ title, detail, time }) {
-  return (
-    <div className="activity-item">
-      <div className="activity-dot"></div>
-      <div className="activity-content">
-        <strong style={{ textTransform: "capitalize" }}>{title}</strong>
-        <span>{detail.length > 60 ? detail.slice(0, 60) + "…" : detail}</span>
-      </div>
-      <time>{time}</time>
     </div>
   );
 }

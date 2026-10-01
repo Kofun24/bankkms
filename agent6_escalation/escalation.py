@@ -46,7 +46,14 @@ def check_low_confidence_trigger(agent4_output: Agent4Output) -> bool:
     Fires when Agent 4's confidence in the final answer is below the
     escalation threshold — regardless of whether Agent 4 called it
     'approved' or already flagged it 'escalated' itself.
+
+    Does not fire when Agent 4 explicitly denied the query (e.g. for
+    insufficient evidence or access violation), which is a legitimate denial
+    rather than an answer requiring low-confidence human review.
     """
+    decision_val = getattr(agent4_output.decision, "value", agent4_output.decision)
+    if decision_val == "denied" or agent4_output.decision == VerificationDecision.DENIED:
+        return False
     return agent4_output.confidence < ESCALATION_CONFIDENCE_THRESHOLD
 
 
@@ -55,8 +62,12 @@ def check_version_conflict_trigger(agent4_output: Agent4Output) -> bool:
     """Member 4 / Agent 4 owner's contribution.
 
     Fires when Agent 4 detected conflicting document versions that it
-    couldn't resolve on its own.
+    couldn't resolve on its own. Does not fire when Agent 4 explicitly
+    denied the query.
     """
+    decision_val = getattr(agent4_output.decision, "value", agent4_output.decision)
+    if decision_val == "denied" or agent4_output.decision == VerificationDecision.DENIED:
+        return False
     return agent4_output.version_conflict_detected
 
 

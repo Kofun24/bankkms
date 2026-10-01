@@ -28,102 +28,97 @@ export default function Login() {
     }
   };
 
+  const fillDemoAdmin = () => {
+    setUsername("demo_admin");
+    setPassword("DemoAdmin123!");
+  };
+
   return (
-    <div className="login-page">
-      <div className="login-left">
-        <div className="login-brand">
-          <div className="brand-mark large">K</div>
-          <div>
-            <div className="brand-name">BANKKMS</div>
-            <div className="brand-subtitle">KNOWLEDGE MANAGEMENT SYSTEM</div>
-          </div>
-        </div>
-
-        <div className="login-message">
-          <span className="eyebrow">CONTROLLED KNOWLEDGE</span>
-          <h1>
-            Trusted knowledge.
-            <br />
-            <em>Precisely governed.</em>
-          </h1>
+    <div className="bk-admin-login-surface">
+      <div className="bk-admin-login-card">
+        <header className="bk-admin-login-header">
+          <div className="bk-admin-badge-inst">BankKMS Administration</div>
+          <h1>System Governance Console</h1>
           <p>
-            BankKMS gives financial institutions control over the knowledge
-            their people access, while ensuring every answer remains grounded in
-            approved documentation.
+            Administrative console for employee account authorization, role promotions, and document
+            metadata management. Query capabilities are structurally disabled on this surface.
           </p>
-          <div className="login-line"></div>
-          <div className="login-footer-text">
-            <span>01</span>
-            <p>Institutional knowledge, securely managed.</p>
+        </header>
+
+        <form onSubmit={handleLogin} className="bk-form">
+          <div className="bk-field-group">
+            <label htmlFor="admin-username" className="bk-label">
+              Administrator Username
+            </label>
+            <input
+              id="admin-username"
+              className="bk-input"
+              type="text"
+              placeholder="e.g. demo_admin"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoFocus
+              required
+            />
           </div>
-        </div>
 
-        <div className="login-copyright">BANKKMS · INTERNAL OPERATIONS</div>
-      </div>
-
-      <div className="login-right">
-        <div className="login-form-container">
-          <div className="mobile-brand">BANKKMS</div>
-
-          <div className="form-heading">
-            <span className="eyebrow">ADMINISTRATOR ACCESS</span>
-            <h2>Welcome back.</h2>
-            <p>Sign in to manage your BankKMS environment.</p>
+          <div className="bk-field-group">
+            <div className="bk-label-row">
+              <label htmlFor="admin-password" className="bk-label">
+                Security Password
+              </label>
+              <button
+                type="button"
+                className="bk-btn-text"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+            <input
+              id="admin-password"
+              className="bk-input"
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
           </div>
 
-          <form onSubmit={handleLogin}>
-            <div className="input-group">
-              <label>USERNAME</label>
-              <div className="input-wrapper">
-                <input
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </div>
+          {error && (
+            <div className="bk-alert-banner" role="alert">
+              <span>{error}</span>
             </div>
+          )}
 
-            <div className="input-group">
-              <label>PASSWORD</label>
-              <div className="input-wrapper">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
-            </div>
+          <button type="submit" className="bk-btn-primary full-width" disabled={loading}>
+            {loading ? "Authenticating Session…" : "Sign In to Admin Console"}
+          </button>
+        </form>
 
-            {error && (
-              <div className="login-error">
-                <span>!</span>
-                {error}
-              </div>
-            )}
-
-            <button className="login-button" type="submit" disabled={loading}>
-              <span>{loading ? "Signing in..." : "Sign in to BankKMS"}</span>
-              <span>→</span>
-            </button>
-          </form>
-
-          <div className="secure-note">
-            <span className="secure-check">✓</span>
-            <div>
-              <strong>Authorized personnel only</strong>
-              <p>This console is restricted to BankKMS administrators.</p>
-            </div>
+        <section className="bk-demo-credentials-box">
+          <div className="bk-demo-header">
+            <span className="bk-demo-title">Evaluation Test Credentials</span>
           </div>
-        </div>
+          <button type="button" className="bk-demo-btn admin" onClick={fillDemoAdmin}>
+            <span className="bk-demo-role admin">Administrator</span>
+            <span className="bk-demo-u">demo_admin</span>
+            <span className="bk-demo-tier">Full Console Access</span>
+          </button>
+        </section>
+
+        <footer className="bk-admin-login-footer">
+          <p>
+            This console is restricted to authorized systems officers. Unauthorized access attempts
+            are recorded in the immutable audit log.
+          </p>
+          <div className="bk-cross-links">
+            <a href="/">Customer Web App</a>
+            <span>·</span>
+            <a href="/staff">Staff Portal</a>
+          </div>
+        </footer>
       </div>
     </div>
   );

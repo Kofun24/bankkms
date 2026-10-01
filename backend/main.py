@@ -322,10 +322,27 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class CitationItem(BaseModel):
+    doc_id: str
+    doc_title: str
+    section: str
+    version: Optional[str] = None
+    effective_date: Optional[str] = None
+
+
+class FinalResponseData(BaseModel):
+    answer: str
+    citations: list[CitationItem] = []
+
+
 class ChatResponse(BaseModel):
     status: str
     message_to_user: str
     needs_clarification: bool = False
+    final_response: Optional[FinalResponseData] = None
+    version_conflict_detected: Optional[bool] = False
+    denial_reason: Optional[str] = None
+    access_level: Optional[str] = None
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -348,10 +365,55 @@ def chat(payload: ChatRequest):
     if "error" in result:
         raise HTTPException(status_code=400, detail=result.get("message", result["error"]))
 
+    agent4 = result.get("agent4_output")
+    agent2 = result.get("agent2_output")
+    agent1 = result.get("agent1_output")
+
+    version_lookup = {}
+    if agent2 and hasattr(agent2, "results"):
+        for chunk in agent2.results:
+            chunk_doc_id = getattr(chunk, "doc_id", None)
+            if chunk_doc_id and chunk_doc_id not in version_lookup:
+                version_lookup[chunk_doc_id] = {
+                    "version": getattr(chunk, "doc_version", None),
+                    "effective_date": getattr(chunk, "effective_date", None),
+                }
+
+    final_resp = None
+    if result.get("final_response"):
+        raw_final = result["final_response"]
+        citations_list = []
+        for c in raw_final.get("citations", []):
+            doc_id = getattr(c, "doc_id", c.get("doc_id", "") if isinstance(c, dict) else "")
+            doc_title = getattr(c, "doc_title", c.get("doc_title", "") if isinstance(c, dict) else "")
+            section = getattr(c, "section", c.get("section", "") if isinstance(c, dict) else "")
+            extra = version_lookup.get(doc_id, {})
+            citations_list.append(CitationItem(
+                doc_id=doc_id,
+                doc_title=doc_title,
+                section=section,
+                version=extra.get("version"),
+                effective_date=extra.get("effective_date"),
+            ))
+        final_resp = FinalResponseData(
+            answer=raw_final.get("answer", ""),
+            citations=citations_list,
+        )
+
+    version_conflict = getattr(agent4, "version_conflict_detected", False) if agent4 else False
+    denial_reason = getattr(agent4, "denial_reason", None) if agent4 else None
+    access_lvl = getattr(agent1, "access_level", None)
+    if hasattr(access_lvl, "value"):
+        access_lvl = access_lvl.value
+
     return ChatResponse(
         status=result.get("status", "unknown"),
         message_to_user=result.get("message_to_user", "Sorry, I couldn't process that."),
         needs_clarification=result.get("status") == "needs_clarification",
+        final_response=final_resp,
+        version_conflict_detected=bool(version_conflict),
+        denial_reason=str(denial_reason) if denial_reason else None,
+        access_level=str(access_lvl) if access_lvl else None,
     )
 
 
