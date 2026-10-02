@@ -156,28 +156,16 @@ export default function Documents() {
 }
 
 function AddDocumentModal({ close, onAdded }) {
-  const [docId, setDocId] = useState("");
-  const [title, setTitle] = useState("");
-  const [access, setAccess] = useState("internal");
-  const [version, setVersion] = useState("v1");
-  const [fileName, setFileName] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
-
-  const filePath = fileName ? `knowledge_base/${fileName}` : "";
 
   function handleFile(file) {
     if (!file) return;
-    setFileName(file.name);
-    if (!title) {
-      // suggest a title from the filename if the user hasn't typed one yet
-      const suggested = file.name
-        .replace(/\.[^/.]+$/, "")
-        .replace(/[_-]/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      setTitle(suggested);
-    }
+    setSelectedFile(file);
+    setError("");
   }
 
   function handleDrop(e) {
@@ -189,22 +177,25 @@ function AddDocumentModal({ close, onAdded }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!fileName) {
+    if (!selectedFile) {
       setError("Select or drop a document file.");
       return;
     }
+    setSubmitting(true);
+    setError("");
     try {
-      await api.addDocument({
-        doc_id: docId,
-        title,
-        access_level: access,
-        version,
-        effective_date: new Date().toISOString().split("T")[0],
-        file_path: filePath,
-      });
+      const result = await api.addDocument(selectedFile);
+      if (result.status === "created_metadata_only") {
+        setError(
+          `Document registered but not yet searchable: ${result.warning || "indexing failed"}`
+        );
+        return;
+      }
       onAdded();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -221,7 +212,7 @@ function AddDocumentModal({ close, onAdded }) {
 
         <form onSubmit={submit}>
           <div
-            className={`dropzone ${isDragging ? "dragging" : ""} ${fileName ? "has-file" : ""}`}
+            className={`dropzone ${isDragging ? "dragging" : ""} ${selectedFile ? "has-file" : ""}`}
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
@@ -230,79 +221,41 @@ function AddDocumentModal({ close, onAdded }) {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.md,.txt,.docx"
+              accept=".md,.txt"
               style={{ display: "none" }}
               onChange={(e) => handleFile(e.target.files?.[0])}
             />
-            {fileName ? (
+            {selectedFile ? (
               <>
                 <div className="dropzone-file-icon">▤</div>
-                <strong>{fileName}</strong>
+                <strong>{selectedFile.name}</strong>
                 <span>Click to choose a different file</span>
               </>
             ) : (
               <>
                 <div className="upload-icon">↑</div>
                 <strong>Drop a document here, or click to browse</strong>
-                <span>PDF, DOCX, MD or TXT</span>
+                <span>Markdown (.md) with YAML frontmatter</span>
               </>
             )}
           </div>
 
-          {fileName && (
-            <p className="dropzone-path-note">
-              Will be saved to <code>{filePath}</code> — make sure the file
-              is placed in your project's <code>knowledge_base/</code>{" "}
-              folder before ingestion runs.
-            </p>
-          )}
-
-          <div className="input-group" style={{ marginTop: 22 }}>
-            <label>DOCUMENT ID</label>
-            <input
-              className="form-input"
-              required
-              placeholder="doc_009"
-              value={docId}
-              onChange={(e) => setDocId(e.target.value)}
-            />
-          </div>
-
-          <div className="input-group">
-            <label>DOCUMENT NAME</label>
-            <input
-              className="form-input"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-
-          <div className="input-group">
-            <label>ACCESS LEVEL</label>
-            <select className="form-input" value={access} onChange={(e) => setAccess(e.target.value)}>
-              <option value="public">PUBLIC</option>
-              <option value="internal">INTERNAL</option>
-              <option value="restricted">RESTRICTED</option>
-            </select>
-          </div>
-
-          <div className="input-group">
-            <label>VERSION</label>
-            <input
-              className="form-input"
-              value={version}
-              onChange={(e) => setVersion(e.target.value)}
-            />
-          </div>
+          <p className="dropzone-path-note">
+            Document ID, title, access level, version, and effective date
+            are all read automatically from the file's own frontmatter —
+            the file is routed to the correct knowledge_base folder and
+            indexed for search immediately after upload.
+          </p>
 
           {error && <div className="login-error"><span>!</span>{error}</div>}
 
           <div className="modal-actions">
-            <button type="button" className="secondary-button" onClick={close}>
+            <button type="button" className="secondary-button" onClick={close} disabled={submitting}>
               Cancel
             </button>
-            <button className="primary-button">Add document</button>
+            <button className="primary-button" disabled={submitting}>
+              {submitting ? "Uploading..." : "Add document"}
+            </button>
           </div>
         </form>
       </div>

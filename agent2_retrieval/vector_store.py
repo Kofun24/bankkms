@@ -1,6 +1,5 @@
 """
-Vector store for Agent 2 — pgvector via SQLAlchemy (replaces the earlier
-Chroma-based implementation).
+Vector store for Agent 2 — pgvector via SQLAlchemy.
 
 Reads/writes through database.models.Document / DocumentChunk, using the
 shared engine/session factory from database.config so Agent 2 never opens
@@ -59,6 +58,25 @@ class VectorStore:
             db.query(Document).delete()
             db.commit()
 
+    def get_document(self, doc_id: str):
+        """Returns the Document row for doc_id, or None if it doesn't exist.
+        Returned object is detached from its session — read-only use only."""
+        with get_session() as db:
+            doc = db.query(Document).filter_by(doc_id=doc_id).first()
+            if doc is None:
+                return None
+            db.expunge(doc)
+            return doc
+
+    def has_chunks(self, document_id: int) -> bool:
+        """True if this document already has at least one chunk indexed.
+        Used instead of 'does a Document row exist' to decide whether
+        ingestion should process a document — a row can exist with zero
+        chunks when created via the Admin Console upload flow, which
+        inserts metadata first and expects chunking to follow separately."""
+        with get_session() as db:
+            return db.query(DocumentChunk.id).filter_by(document_id=document_id).first() is not None
+
     def add_document(
         self,
         doc_id: str,
@@ -70,8 +88,9 @@ class VectorStore:
         is_current: bool = True,
     ) -> tuple[int, bool]:
         """Inserts a Document row if doc_id doesn't already exist.
-        Returns (internal_id, was_created) — was_created lets the caller
-        skip re-chunking a document that's already seeded."""
+        Returns (internal_id, was_created). was_created=False does NOT by
+        itself mean the document is already chunked — check has_chunks()
+        separately for that."""
         with get_session() as db:
             existing = db.query(Document).filter_by(doc_id=doc_id).first()
             if existing:
@@ -83,6 +102,7 @@ class VectorStore:
                 version=version,
                 effective_date=effective_date,
                 file_path=file_path,
+                is_current=is_current,
             )
             db.add(doc)
             db.commit()
