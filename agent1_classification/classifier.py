@@ -149,7 +149,7 @@ def classify_query(
         possible_injection_attempt=sanitized.possible_injection_attempt,
     )
 
-    return Agent1Output(
+    result = Agent1Output(
         session_id=session_id,
         user_role=ctx.user_role,
         access_level=ctx.access_level,
@@ -161,3 +161,5 @@ def classify_query(
         clarifying_question=clarifying_question,
         flags=flags,
     )
+
+    return result

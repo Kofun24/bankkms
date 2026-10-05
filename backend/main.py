@@ -38,6 +38,7 @@ from agent1_classification.admin_operations import (
 from agent1_classification.auth import (
     InvalidCredentialsError,
     UnauthorizedRoleError,
+    NoQueryAccessError,
     end_session,
     login as auth_login,
 )
@@ -342,9 +343,13 @@ def chat(payload: ChatRequest):
             status_code=503,
             detail=f"Query pipeline not available on this branch yet: {e}",
         )
-
-    result = run_pipeline(payload.session_id, payload.message)
-
+    try:
+        result = run_pipeline(payload.session_id, payload.message)
+    except NoQueryAccessError as e:
+        raise HTTPException(
+            status_code=403,
+            detail="This session is not authorized to query the knowledge base.",
+        )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result.get("message", result["error"]))
 
@@ -359,3 +364,33 @@ def chat(payload: ChatRequest):
 def new_chat_session():
     """Generates a fresh anonymous session token for a new customer visitor."""
     return {"session_id": str(uuid.uuid4())}
+
+# ---------------- Staff Login (Employee / Compliance) ----------------
+
+class StaffLoginResponse(BaseModel):
+    session_id: str
+    username: str
+    role: str
+    access_level: str
+
+
+@app.post("/api/staff/login", response_model=StaffLoginResponse)
+def staff_login(payload: LoginRequest):
+    try:
+        ctx = auth_login(payload.username, payload.password)
+    except InvalidCredentialsError:
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+    if ctx.user_role not in (UserRole.EMPLOYEE, UserRole.COMPLIANCE):
+        end_session(ctx.session_id)
+        raise HTTPException(
+            status_code=403,
+            detail="This portal is for employee and compliance accounts only.",
+        )
+
+    return StaffLoginResponse(
+        session_id=ctx.session_id,
+        username=payload.username,
+        role=ctx.user_role.value,
+        access_level=ctx.access_level.value,
+    )

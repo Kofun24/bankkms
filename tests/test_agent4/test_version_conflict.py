@@ -5,6 +5,12 @@ Rule under test: if two citations resolve to chunks that share the same
 doc_title but differ in (doc_version, effective_date), that's a
 conflict Agent 4 must surface (e.g. "minimum balance v1" vs "v2" cited
 in the same answer).
+
+Note: these tests exercise the LEGACY offline path (no version_lookup
+passed -- comparing versions already present in Agent2Output). The real
+DB-backed path (agent4_verification.db_integration.version_lookup_from_db)
+needs a live database and isn't covered by this offline suite; verify it
+manually via run_live_query.py.
 """
 
 from agent4_verification.verifier import check_version_conflict

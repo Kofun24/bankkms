@@ -7,6 +7,8 @@ import Documents from "./pages/Documents";
 import AuditLog from "./pages/AuditLog";
 import CustomerChat from "./pages/CustomerChat";
 import Layout from "./components/Layout";
+import StaffLogin from "./pages/StaffLogin";
+import StaffChat from "./pages/StaffChat";
 
 function ProtectedRoute({ children }) {
   const isLoggedIn = localStorage.getItem("bankkms_session");
@@ -18,7 +20,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/chat" element={<CustomerChat />} />
-
+      <Route path="/staff" element={<StaffLogin />} />
+      <Route path="/staff/chat" element={<StaffChat />} />
       <Route
         path="/admin"
         element={
