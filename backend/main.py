@@ -38,6 +38,7 @@ from agent1_classification.admin_operations import (
 from agent1_classification.auth import (
     InvalidCredentialsError,
     UnauthorizedRoleError,
+    NoQueryAccessError,
     end_session,
     login as auth_login,
 )
@@ -359,9 +360,13 @@ def chat(payload: ChatRequest):
             status_code=503,
             detail=f"Query pipeline not available on this branch yet: {e}",
         )
-
-    result = run_pipeline(payload.session_id, payload.message)
-
+    try:
+        result = run_pipeline(payload.session_id, payload.message)
+    except NoQueryAccessError as e:
+        raise HTTPException(
+            status_code=403,
+            detail="This session is not authorized to query the knowledge base.",
+        )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result.get("message", result["error"]))
 
