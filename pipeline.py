@@ -117,55 +117,6 @@ def _message_for_reason(reason: str | None, denied: bool) -> str:
     return _DENIED_FALLBACK if denied else _ESCALATED_FALLBACK
 
 
-def resolve_pipeline_status(
-    agent4_output: Agent4Output,
-    agent6_output: Agent6Output,
-) -> tuple[str, str]:
-    """Resolves final user-facing status and message.
-
-    Status resolution priority:
-    1. Legitimate denials (access violation, insufficient evidence):
-       Return status="denied" unless a session/security escalation trigger
-       (REPEATED_DENIAL or SUSPICIOUS_PATTERN) takes precedence.
-    2. Agent 6 escalation (low confidence, version conflict, etc.):
-       Return status="escalated" with Agent 6's reassuring message.
-    3. Approved answer:
-       Return status="answered" with final answer text (and version note if flagged).
-    4. Otherwise (e.g. Agent 4 pre-escalated but Agent 6 didn't independently trigger):
-       Return status="escalated".
-    """
-    if agent4_output.decision.value == "denied":
-        # A legitimate denial (e.g. insufficient_evidence, access_violation)
-        # must return status="denied" rather than being masked as a generic
-        # escalation. Only true session/security triggers (e.g. repeated
-        # denials or prompt-injection attempts) take precedence.
-        if agent6_output.escalation_triggered and agent6_output.trigger_reason in (
-            EscalationReason.REPEATED_DENIAL,
-            EscalationReason.SUSPICIOUS_PATTERN,
-        ):
-            return "escalated", agent6_output.user_facing_message
-        return "denied", _message_for_reason(agent4_output.denial_reason, denied=True)
-
-    if agent6_output.escalation_triggered:
-        return "escalated", agent6_output.user_facing_message
-
-    if agent4_output.decision.value == "approved":
-        msg = agent4_output.final_answer or ""
-        if agent4_output.version_conflict_detected:
-            # Not a blocker — Agent 2 already retrieved only the current
-            # version, so the answer itself is correct. This is purely a
-            # transparency note: the document has prior versions on
-            # record, worth surfacing since policy figures do change.
-            msg += (
-                "\n\n(Note: this policy has been updated before — the "
-                "figures above reflect the current version.)"
-            )
-        return "answered", msg
-
-    # decision == "escalated" but Agent 6 didn't independently trigger
-    return "escalated", _message_for_reason(agent4_output.denial_reason, denied=False)
-
-
 def run_pipeline(session_id: str, raw_query: str) -> dict:
     """
     Runs the full BankKMS pipeline for a single user query.
@@ -238,7 +189,6 @@ def run_pipeline(session_id: str, raw_query: str) -> dict:
         agent1_output,
     )
 
-    status, message_to_user = resolve_pipeline_status(agent4_output, agent6_output)
     # A definitive denial from Agent 4 takes precedence over
     # Agent 6's generic escalation result.
     if agent4_output.decision.value == "denied":
