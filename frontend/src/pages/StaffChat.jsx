@@ -5,12 +5,20 @@ import { api } from "../api";
 const STAFF_SESSION_KEY = "bankkms_staff_session";
 const STAFF_USER_KEY = "bankkms_staff_user";
 
+function formatTitleCase(str) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
 function getStorageHistoryKey(username) {
   return `bankkms_staff_threads_${username || "unknown"}`;
 }
 
 function createDefaultThread(user) {
   const now = new Date();
+  const roleName = formatTitleCase(user?.role || "employee");
+  const tierName = formatTitleCase(user?.access_level || "internal");
+
   return {
     id: `thread_${Date.now()}`,
     title: "New Consultation",
@@ -20,7 +28,7 @@ function createDefaultThread(user) {
       {
         role: "assistant",
         status: "answered",
-        text: `Welcome, ${user?.username || "Staff"}. Your session is initialized with ${user?.access_level?.toUpperCase() || "INTERNAL"} access tier (${user?.role?.toUpperCase() || "EMPLOYEE"} role). All queries are verified against authorized knowledge boundaries and recorded in the immutable audit log.`,
+        text: `Welcome, ${user?.username || "Staff"}. Your session is initialized with ${tierName} access tier (${roleName} role). All queries are verified against authorized knowledge boundaries and recorded in the immutable audit log.`,
         timestamp: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       },
     ],
@@ -62,6 +70,7 @@ export default function StaffChat() {
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [historySearch, setHistorySearch] = useState("");
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -125,9 +134,11 @@ export default function StaffChat() {
 
   function handleClearAllHistory() {
     if (!user) return;
-    const fresh = createDefaultThread(user);
-    persistThreads([fresh]);
-    setActiveThreadId(fresh.id);
+    if (window.confirm("Clear all consultation history for this session?")) {
+      const fresh = createDefaultThread(user);
+      persistThreads([fresh]);
+      setActiveThreadId(fresh.id);
+    }
   }
 
   async function handleSend(queryText) {
@@ -146,7 +157,7 @@ export default function StaffChat() {
       if (t.id === activeThread.id) {
         const isDefaultTitle = t.title === "New Consultation" || t.messages.length <= 1;
         const newTitle = isDefaultTitle
-          ? text.slice(0, 38) + (text.length > 38 ? "…" : "")
+          ? text.slice(0, 36) + (text.length > 36 ? "…" : "")
           : t.title;
         return {
           ...t,
@@ -236,6 +247,8 @@ export default function StaffChat() {
 
   const isCompliance = user.role === "compliance";
   const tierClass = isCompliance ? "restricted" : "internal";
+  const tierName = formatTitleCase(user.access_level);
+  const roleName = formatTitleCase(user.role);
 
   const sampleQuestions = isCompliance
     ? [
@@ -248,6 +261,10 @@ export default function StaffChat() {
         "What is the mandatory timeline for resolving customer fee complaints?",
         "What are the identity verification procedures for non-resident retail accounts?",
       ];
+
+  const filteredThreads = threads.filter((t) =>
+    t.title.toLowerCase().includes(historySearch.toLowerCase())
+  );
 
   return (
     <div className="bk-staff-workspace">
@@ -264,13 +281,13 @@ export default function StaffChat() {
             type="button"
             className="bk-btn-secondary bk-history-toggle-btn"
             onClick={() => setSidebarOpen((prev) => !prev)}
-            title="Toggle Chat History"
+            title="Toggle Consultation History"
           >
-            {sidebarOpen ? "Hide History" : "Chat History"}
+            {sidebarOpen ? "Hide History" : "Consultation History"}
           </button>
           <div className="bk-user-credential-pill">
             <span className="bk-user-name">{user.username}</span>
-            <span className={`bk-role-tag ${user.role}`}>{user.role}</span>
+            <span className={`bk-role-tag ${user.role}`}>{roleName}</span>
           </div>
           <button type="button" className="bk-btn-secondary" onClick={handleLogout}>
             Sign Out
@@ -283,7 +300,7 @@ export default function StaffChat() {
         <div className="bk-trust-ladder-content">
           <div className="bk-tier-title-row">
             <span className={`bk-tier-badge ${tierClass}`}>
-              Access Tier: {user.access_level.toUpperCase()}
+              Access Tier: {tierName}
             </span>
             <span className="bk-tier-role-desc">
               Enforced at Retrieval &amp; Verification Stages
@@ -297,30 +314,44 @@ export default function StaffChat() {
         </div>
       </div>
 
-      {/* Main Layout: History Sidebar (for logged-in accounts) + Chat Area */}
+      {/* Main Layout: History Sidebar + Chat Area */}
       <div className="bk-staff-layout">
-        {/* Chat History Sidebar — Dedicated to Logged-in Staff Accounts */}
+        {/* Chat History Sidebar */}
         {sidebarOpen && (
-          <aside className="bk-staff-history-sidebar" aria-label="Staff Chat History">
+          <aside className="bk-staff-history-sidebar" aria-label="Staff Consultation History">
             <div className="bk-history-sidebar-header">
               <button
                 type="button"
                 className="bk-btn-primary full-width"
                 onClick={handleNewChat}
               >
-                + New Chat
+                + New Consultation
               </button>
             </div>
+
+            {threads.length > 4 && (
+              <div className="bk-history-search-box">
+                <input
+                  type="text"
+                  className="bk-history-search-input"
+                  placeholder="Filter history…"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                />
+              </div>
+            )}
 
             <div className="bk-history-section-title">
               <span>Saved Consultations ({threads.length})</span>
             </div>
 
             <div className="bk-history-thread-list">
-              {threads.map((thread) => {
+              {filteredThreads.map((thread) => {
                 const isActive = thread.id === activeThreadId;
                 const queryCount = thread.messages.filter((m) => m.role === "user").length;
-                const formattedDate = new Date(thread.updatedAt || thread.createdAt).toLocaleDateString([], {
+                const formattedDate = new Date(
+                  thread.updatedAt || thread.createdAt
+                ).toLocaleDateString([], {
                   month: "short",
                   day: "numeric",
                 });
@@ -343,7 +374,9 @@ export default function StaffChat() {
                       <div className="bk-history-item-meta tabular-nums">
                         <span>{formattedDate}</span>
                         <span>·</span>
-                        <span>{queryCount} {queryCount === 1 ? "query" : "queries"}</span>
+                        <span>
+                          {queryCount} {queryCount === 1 ? "query" : "queries"}
+                        </span>
                       </div>
                     </div>
                     {threads.length > 1 && (
@@ -390,15 +423,15 @@ export default function StaffChat() {
                       <div className="bk-msg-content">{msg.text}</div>
                     </div>
                   ) : (
-                    <StaffResponseCard message={msg} role={user.role} />
+                    <StaffResponseCard message={msg} role={roleName} />
                   )}
                 </div>
               ))}
 
-              {/* Quiet Answering Indicator — NO "in-process" text */}
+              {/* Quiet Answering Indicator */}
               {sending && (
                 <div className="bk-staff-msg-row assistant">
-                  <div className="bk-typing-indicator" aria-label="Thinking">
+                  <div className="bk-typing-indicator" aria-label="Evaluating query">
                     <span className="bk-typing-dot"></span>
                     <span className="bk-typing-dot"></span>
                     <span className="bk-typing-dot"></span>
@@ -409,7 +442,7 @@ export default function StaffChat() {
 
             {/* Quick Prompt Suggestions */}
             <div className="bk-staff-quick-prompts">
-              <span className="bk-quick-label">Authorized Query Suggestions:</span>
+              <span className="bk-quick-label">Authorized Policy Queries:</span>
               <div className="bk-quick-list">
                 {sampleQuestions.map((q, idx) => (
                   <button
@@ -441,7 +474,7 @@ export default function StaffChat() {
                   id="staff-query-input"
                   className="bk-staff-input"
                   type="text"
-                  placeholder={`Ask an authorized ${user.role} question across ${user.access_level} documentation…`}
+                  placeholder={`Ask an authorized ${roleName.toLowerCase()} question across ${tierName.toLowerCase()} documentation…`}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   disabled={sending}
@@ -465,7 +498,7 @@ export default function StaffChat() {
 
 /**
  * Detailed Staff Response Card with explicit status handling:
- * - Answered (with detailed version + effective date citations)
+ * - Answered (with detailed version + effective date citations and copy button)
  * - Version conflict note (styled as informational notice, not error)
  * - Needs clarification
  * - Denied (access tier boundary)
@@ -473,11 +506,19 @@ export default function StaffChat() {
  */
 function StaffResponseCard({ message, role }) {
   const { status, text, final_response, version_conflict_detected, timestamp } = message;
+  const [copied, setCopied] = useState(false);
 
   const citations =
     final_response?.citations && final_response.citations.length > 0
       ? final_response.citations
       : [];
+
+  const handleCopy = () => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <article className={`bk-staff-card status-${status}`}>
@@ -489,11 +530,21 @@ function StaffResponseCard({ message, role }) {
               <span className="bk-status-pill answered">Verified &amp; Grounded</span>
               <span className="bk-status-caption">Grounded in official policy</span>
             </div>
-            <time className="bk-msg-time">{timestamp}</time>
+            <div className="bk-header-meta-group">
+              <button
+                type="button"
+                className="bk-btn-text bk-copy-answer-btn"
+                onClick={handleCopy}
+                title="Copy response to clipboard"
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+              <time className="bk-msg-time">{timestamp}</time>
+            </div>
           </div>
 
           <div className="bk-staff-card-body">
-            {/* Version conflict note styled as information, NOT an error */}
+            {/* Version conflict note styled as informational notice, NOT an error */}
             {version_conflict_detected && (
               <div className="bk-version-conflict-notice">
                 <div className="bk-conflict-icon">i</div>
@@ -525,7 +576,7 @@ function StaffResponseCard({ message, role }) {
                       <div className="bk-cite-details tabular-nums">
                         <span className="bk-cite-section">{cite.section}</span>
                         {cite.version && (
-                          <span className="bk-cite-meta-pill">Ver: {cite.version}</span>
+                          <span className="bk-cite-meta-pill">v{cite.version}</span>
                         )}
                         {cite.effective_date && (
                           <span className="bk-cite-meta-pill">
@@ -580,7 +631,7 @@ function StaffResponseCard({ message, role }) {
             <div className="bk-denied-callout staff">
               <p className="bk-denied-reason">{text}</p>
               <p className="bk-denied-hint">
-                This document requires higher privilege tier than your active session ({role}).
+                This document requires a higher privilege tier than your active session ({role}).
                 Access attempts are logged for compliance monitoring.
               </p>
             </div>

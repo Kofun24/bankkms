@@ -58,7 +58,8 @@ export default function Employees() {
 
   const filtered = employees.filter((emp) => {
     const matchSearch = emp.username.toLowerCase().includes(search.toLowerCase());
-    const matchRole = roleFilter === "ALL" || emp.role.toUpperCase() === roleFilter;
+    const matchRole =
+      roleFilter === "ALL" || emp.role.toLowerCase() === roleFilter.toLowerCase();
     return matchSearch && matchRole;
   });
 
@@ -127,19 +128,21 @@ export default function Employees() {
   const promptChangeRole = (emp, targetRole) => {
     if (emp.role === targetRole) return;
     setActionError("");
+    const targetLabel = targetRole === "compliance" ? "Compliance" : "Employee";
     setConfirmAction({
-      title: `Change Account Role to ${targetRole.toUpperCase()}`,
+      title: `Change Account Role to ${targetLabel}`,
       message: `Modify ${emp.username}'s access from ${emp.role} to ${targetRole}. This alters their knowledge access tier to ${
-        targetRole === "compliance"
-          ? "Restricted"
-          : targetRole === "employee"
-          ? "Internal"
-          : "Admin"
+        targetRole === "compliance" ? "Restricted" : "Internal"
       }.`,
       confirmLabel: "Apply Role Change",
       isDestructive: false,
       run: () => api.changeRole(emp.username, targetRole),
     });
+  };
+
+  const formatRoleName = (role) => {
+    if (!role) return "";
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
   };
 
   return (
@@ -180,14 +183,19 @@ export default function Employees() {
           />
         </div>
         <div className="bk-filter-group" role="group" aria-label="Role Filters">
-          {["ALL", "EMPLOYEE", "COMPLIANCE", "ADMIN"].map((r) => (
+          {[
+            { id: "ALL", label: "All Roles" },
+            { id: "employee", label: "Employee" },
+            { id: "compliance", label: "Compliance" },
+            { id: "admin", label: "Admin" },
+          ].map((r) => (
             <button
-              key={r}
+              key={r.id}
               type="button"
-              className={`bk-filter-btn ${roleFilter === r ? "active" : ""}`}
-              onClick={() => setRoleFilter(r)}
+              className={`bk-filter-btn ${roleFilter === r.id ? "active" : ""}`}
+              onClick={() => setRoleFilter(r.id)}
             >
-              {r}
+              {r.label}
             </button>
           ))}
         </div>
@@ -216,7 +224,9 @@ export default function Employees() {
                       <span className="bk-cell-username tabular-nums">{emp.username}</span>
                     </td>
                     <td>
-                      <span className={`bk-role-badge ${emp.role}`}>{emp.role}</span>
+                      <span className={`bk-role-badge ${emp.role}`}>
+                        {formatRoleName(emp.role)}
+                      </span>
                     </td>
                     <td>
                       <span

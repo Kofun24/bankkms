@@ -13,4 +13,5 @@ uvicorn
 pytest
 scikit-learn
 pyyaml
+python-multipart
 

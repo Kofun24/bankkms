@@ -1,28 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "../api";
 
 export default function Documents() {
   const [documents, setDocuments] = useState([]);
   const [search, setSearch] = useState("");
   const [tierFilter, setTierFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL, CURRENT, RETIRED
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Add document modal state
-  const [newTitle, setNewTitle] = useState("");
-  const [newAccess, setNewAccess] = useState("public");
-  const [newVersion, setNewVersion] = useState("v1.0");
-  const [newEffectiveDate, setNewEffectiveDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [addLoading, setAddLoading] = useState(false);
-  const [addError, setAddError] = useState("");
-
-  // Retiring state
-  const [retireConfirm, setRetireConfirm] = useState(null);
+  // Retiring confirmation state
+  const [retireConfirmDoc, setRetireConfirmDoc] = useState(null);
   const [retireLoading, setRetireLoading] = useState(false);
+  const [retireError, setRetireError] = useState("");
 
   async function loadDocuments() {
     setLoading(true);
@@ -60,61 +51,49 @@ export default function Documents() {
   }, []);
 
   const filtered = documents.filter((doc) => {
-    const matchSearch = doc.title.toLowerCase().includes(search.toLowerCase());
-    const matchTier = tierFilter === "ALL" || doc.access_level.toUpperCase() === tierFilter;
-    const matchStatus =
+    const term = search.toLowerCase();
+    const matchesSearch =
+      doc.title.toLowerCase().includes(term) ||
+      (doc.doc_id && doc.doc_id.toLowerCase().includes(term));
+    const matchesTier =
+      tierFilter === "ALL" ||
+      doc.access_level.toUpperCase() === tierFilter.toUpperCase();
+    const matchesStatus =
       statusFilter === "ALL" ||
       (statusFilter === "CURRENT" && doc.is_current) ||
       (statusFilter === "RETIRED" && !doc.is_current);
-    return matchSearch && matchTier && matchStatus;
+    return matchesSearch && matchesTier && matchesStatus;
   });
 
-  async function handleAddDocument(e) {
-    e.preventDefault();
-    setAddError("");
-    setAddLoading(true);
+  const promptRetire = (doc) => {
+    setRetireError("");
+    setRetireConfirmDoc(doc);
+  };
 
-    try {
-      await api.addDocument({
-        title: newTitle.trim(),
-        access_level: newAccess,
-        version: newVersion.trim(),
-        effective_date: newEffectiveDate,
-      });
-      setShowAddModal(false);
-      setNewTitle("");
-      setNewAccess("public");
-      setNewVersion("v1.0");
-      loadDocuments();
-    } catch (err) {
-      setAddError(err.message || "Failed to add document metadata.");
-    } finally {
-      setAddLoading(false);
-    }
-  }
-
-  async function handleRetire(docId) {
+  const handleConfirmRetire = async () => {
+    if (!retireConfirmDoc) return;
     setRetireLoading(true);
+    setRetireError("");
     try {
-      await api.retireDocument(docId);
-      setRetireConfirm(null);
+      await api.retireDocument(retireConfirmDoc.doc_id);
+      setRetireConfirmDoc(null);
       loadDocuments();
     } catch (err) {
-      setError(err.message || "Failed to retire document.");
+      setRetireError(err.message || "Failed to retire document.");
     } finally {
       setRetireLoading(false);
     }
-  }
+  };
 
   return (
     <div className="bk-admin-page">
+      {/* Header bar */}
       <div className="bk-page-header">
         <div>
           <span className="bk-section-tag">Knowledge Governance</span>
-          <h1 className="bk-page-title">Document Metadata Registry</h1>
+          <h1 className="bk-page-title">Document Registry</h1>
           <p className="bk-page-desc">
-            Define approved documentation metadata, access boundaries, and revision lifecycle.
-            Retrieval agents only query active versions.
+            Authorized repository of approved policies, regulatory charters, and operational guides.
           </p>
         </div>
         <button
@@ -122,7 +101,7 @@ export default function Documents() {
           className="bk-btn-primary"
           onClick={() => setShowAddModal(true)}
         >
-          Register Document
+          Add Document
         </button>
       </div>
 
@@ -132,13 +111,13 @@ export default function Documents() {
         </div>
       )}
 
-      {/* Toolbar with Tier & Status Filter Controls */}
+      {/* Toolbar: Search and Filter Groups */}
       <div className="bk-toolbar">
         <div className="bk-search-box">
           <input
             className="bk-search-input"
             type="text"
-            placeholder="Search by document title (e.g. Savings Guide, AML Procedure)…"
+            placeholder="Search documents by title or ID…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -153,7 +132,13 @@ export default function Documents() {
                 className={`bk-filter-btn ${tierFilter === t ? "active" : ""}`}
                 onClick={() => setTierFilter(t)}
               >
-                {t}
+                {t === "ALL"
+                  ? "All Tiers"
+                  : t === "PUBLIC"
+                  ? "Public"
+                  : t === "INTERNAL"
+                  ? "Internal"
+                  : "Restricted"}
               </button>
             ))}
           </div>
@@ -166,24 +151,24 @@ export default function Documents() {
                 className={`bk-filter-btn ${statusFilter === s ? "active" : ""}`}
                 onClick={() => setStatusFilter(s)}
               >
-                {s}
+                {s === "ALL" ? "All Statuses" : s === "CURRENT" ? "Current" : "Retired"}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Document Table */}
+      {/* Document Ledger Table */}
       <section className="bk-table-card">
         <div className="bk-table-container">
           <table className="bk-data-table">
             <thead>
               <tr>
-                <th scope="col">Document Title</th>
+                <th scope="col">Document Policy &amp; ID</th>
                 <th scope="col">Version</th>
-                <th scope="col">Access Tier</th>
                 <th scope="col">Effective Date</th>
-                <th scope="col">Lifecycle Status</th>
+                <th scope="col">Access Tier</th>
+                <th scope="col">Status</th>
                 <th scope="col" className="text-right">
                   Actions
                 </th>
@@ -192,43 +177,56 @@ export default function Documents() {
             <tbody>
               {!loading &&
                 filtered.map((doc) => (
-                  <tr key={doc.id}>
+                  <tr key={doc.id || doc.doc_id}>
                     <td>
                       <div className="bk-doc-cell">
                         <strong className="bk-doc-cell-title">{doc.title}</strong>
-                        {doc.id && <span className="bk-doc-cell-id tabular-nums">{doc.id}</span>}
+                        <span className="bk-doc-cell-id tabular-nums">{doc.doc_id}</span>
                       </div>
                     </td>
                     <td>
                       <span className="bk-version-badge tabular-nums">{doc.version}</span>
                     </td>
                     <td>
-                      <span className={`bk-tier-pill ${doc.access_level.toLowerCase()}`}>
-                        {doc.access_level}
+                      <span className="bk-date-text tabular-nums">
+                        {doc.effective_date || "—"}
                       </span>
                     </td>
                     <td>
-                      <span className="bk-date-text tabular-nums">{doc.effective_date}</span>
+                      <span className={`bk-tier-pill ${doc.access_level.toLowerCase()}`}>
+                        {doc.access_level === "public"
+                          ? "Public"
+                          : doc.access_level === "internal"
+                          ? "Internal"
+                          : doc.access_level === "restricted"
+                          ? "Restricted"
+                          : doc.access_level}
+                      </span>
                     </td>
                     <td>
                       <span
-                        className={`bk-lifecycle-badge ${doc.is_current ? "current" : "retired"}`}
+                        className={`bk-account-status ${
+                          doc.is_current ? "active" : "inactive"
+                        }`}
                       >
                         {doc.is_current ? "Current" : "Retired"}
                       </span>
                     </td>
                     <td className="text-right">
-                      {doc.is_current ? (
-                        <button
-                          type="button"
-                          className="bk-btn-table destructive"
-                          onClick={() => setRetireConfirm(doc)}
-                        >
-                          Retire Document
-                        </button>
-                      ) : (
-                        <span className="bk-retired-label">Superseded</span>
-                      )}
+                      <div className="bk-action-btn-group">
+                        {doc.is_current ? (
+                          <button
+                            type="button"
+                            className="bk-btn-table destructive"
+                            onClick={() => promptRetire(doc)}
+                            title="Retire document from active pipeline retrieval"
+                          >
+                            Retire Policy
+                          </button>
+                        ) : (
+                          <span className="bk-retired-label">Superseded</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -237,171 +235,56 @@ export default function Documents() {
 
           {loading && (
             <div className="bk-table-loading">
-              <span>Scanning document catalog…</span>
+              <span>Loading document repository…</span>
             </div>
           )}
 
-          {/* Deliberate Empty State */}
           {!loading && filtered.length === 0 && (
-            <div className="bk-empty-table-state invitation">
-              <div className="bk-invitation-badge">Registry Empty</div>
-              <h3>
-                {documents.length === 0
-                  ? "No Knowledge Documents Registered"
-                  : "No Documents Match Filter"}
-              </h3>
+            <div className="bk-empty-table-state">
+              <h3>No Documents Found</h3>
               <p>
-                {documents.length === 0
-                  ? "The BankKMS knowledge base currently has no active policies. Register approved documents (such as Savings Account Guide, AML Procedure, or KYC Requirements) to enable retrieval."
-                  : `No policies match the selected filters (Tier: ${tierFilter}, Status: ${statusFilter}${
-                      search ? `, Search: "${search}"` : ""
-                    }).`}
+                No documents match your query ({search ? `search: "${search}", ` : ""}
+                tier: {tierFilter.toLowerCase()}, status: {statusFilter.toLowerCase()}).
               </p>
-              <div className="bk-empty-actions">
-                <button
-                  type="button"
-                  className="bk-btn-primary"
-                  onClick={() => setShowAddModal(true)}
-                >
-                  Register New Document
-                </button>
-                {documents.length > 0 && (
-                  <button
-                    type="button"
-                    className="bk-btn-secondary"
-                    onClick={() => {
-                      setSearch("");
-                      setTierFilter("ALL");
-                      setStatusFilter("ALL");
-                    }}
-                  >
-                    Clear Filter Criteria
-                  </button>
-                )}
-              </div>
+              <button
+                type="button"
+                className="bk-btn-secondary"
+                onClick={() => {
+                  setSearch("");
+                  setTierFilter("ALL");
+                  setStatusFilter("ALL");
+                }}
+              >
+                Reset Filters
+              </button>
             </div>
           )}
         </div>
       </section>
 
-      {/* Register Document Modal */}
-      {showAddModal && (
-        <div className="bk-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="bk-modal-card">
-            <header className="bk-modal-header">
-              <h2>Register Document Metadata</h2>
-              <button
-                type="button"
-                className="bk-modal-close"
-                onClick={() => setShowAddModal(false)}
-                aria-label="Close dialog"
-              >
-                ×
-              </button>
-            </header>
-
-            <form onSubmit={handleAddDocument} className="bk-form">
-              <div className="bk-field-group">
-                <label htmlFor="doc-title-input" className="bk-label">
-                  Document Title
-                </label>
-                <input
-                  id="doc-title-input"
-                  className="bk-input"
-                  type="text"
-                  placeholder="e.g. Savings Account Product Guide, AML Procedure, KYC Requirements"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div className="bk-field-group">
-                <label htmlFor="doc-tier-select" className="bk-label">
-                  Access Classification Tier
-                </label>
-                <select
-                  id="doc-tier-select"
-                  className="bk-select"
-                  value={newAccess}
-                  onChange={(e) => setNewAccess(e.target.value)}
-                >
-                  <option value="public">Public (Available to Customers, Staff, Compliance)</option>
-                  <option value="internal">Internal (Available to Employees &amp; Compliance)</option>
-                  <option value="restricted">Restricted (Strict Compliance &amp; Audit Scope Only)</option>
-                </select>
-                <span className="bk-field-help">
-                  Enforces retrieval boundaries. Queries below this access level cannot retrieve
-                  sections from this document.
-                </span>
-              </div>
-
-              <div className="bk-grid-2">
-                <div className="bk-field-group">
-                  <label htmlFor="doc-version-input" className="bk-label">
-                    Version Number
-                  </label>
-                  <input
-                    id="doc-version-input"
-                    className="bk-input"
-                    type="text"
-                    placeholder="e.g. v1.0 or v2.1"
-                    value={newVersion}
-                    onChange={(e) => setNewVersion(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="bk-field-group">
-                  <label htmlFor="doc-date-input" className="bk-label">
-                    Effective Date
-                  </label>
-                  <input
-                    id="doc-date-input"
-                    className="bk-input"
-                    type="date"
-                    value={newEffectiveDate}
-                    onChange={(e) => setNewEffectiveDate(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              {addError && (
-                <div className="bk-alert-banner" role="alert">
-                  <span>{addError}</span>
-                </div>
-              )}
-
-              <footer className="bk-modal-footer">
-                <button
-                  type="button"
-                  className="bk-btn-secondary"
-                  onClick={() => setShowAddModal(false)}
-                  disabled={addLoading}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="bk-btn-primary" disabled={addLoading}>
-                  {addLoading ? "Saving Metadata…" : "Register Document"}
-                </button>
-              </footer>
-            </form>
-          </div>
+      {/* Governance Explanation Card */}
+      <section className="bk-governance-summary-banner">
+        <div className="bk-gov-banner-badge">Knowledge Governance Axiom</div>
+        <div className="bk-gov-banner-body">
+          <h3>Only active documents are referenced in verified pipeline answers.</h3>
+          <p>
+            When policies are updated, superseded versions are flagged as retired. Retired
+            documents remain preserved for cryptographic audit chain verification but are strictly
+            excluded from customer and staff query retrieval.
+          </p>
         </div>
-      )}
+      </section>
 
-      {/* Retire Document Confirmation Modal */}
-      {retireConfirm && (
+      {/* Retire Confirmation Modal */}
+      {retireConfirmDoc && (
         <div className="bk-modal-backdrop" role="dialog" aria-modal="true">
           <div className="bk-modal-card">
             <header className="bk-modal-header">
-              <h2>Retire Document: {retireConfirm.title}</h2>
+              <h2>Retire Knowledge Document</h2>
               <button
                 type="button"
                 className="bk-modal-close"
-                onClick={() => setRetireConfirm(null)}
+                onClick={() => setRetireConfirmDoc(null)}
                 aria-label="Close dialog"
               >
                 ×
@@ -410,20 +293,26 @@ export default function Documents() {
 
             <div className="bk-modal-body">
               <p>
-                Retiring <strong>{retireConfirm.title}</strong> ({retireConfirm.version}) will flag
-                it as superseded in the metadata store.
+                Are you sure you want to retire <strong>{retireConfirmDoc.title}</strong> (
+                <code className="bk-code-inline tabular-nums">{retireConfirmDoc.doc_id}</code>)?
               </p>
-              <p className="bk-modal-warning-text">
-                Active retrieval passes will no longer surface sections from this version,
-                preventing outdated policy guidance from reaching customers or staff.
+              <p className="bk-field-help" style={{ marginTop: 8 }}>
+                Once retired, this document will be excluded from all vector retrieval steps.
+                Historical citations in the immutable audit ledger will remain intact.
               </p>
+
+              {retireError && (
+                <div className="bk-alert-banner" role="alert" style={{ marginTop: 12 }}>
+                  <span>{retireError}</span>
+                </div>
+              )}
             </div>
 
             <footer className="bk-modal-footer">
               <button
                 type="button"
                 className="bk-btn-secondary"
-                onClick={() => setRetireConfirm(null)}
+                onClick={() => setRetireConfirmDoc(null)}
                 disabled={retireLoading}
               >
                 Cancel
@@ -431,15 +320,203 @@ export default function Documents() {
               <button
                 type="button"
                 className="bk-btn-primary destructive"
-                onClick={() => handleRetire(retireConfirm.id)}
+                onClick={handleConfirmRetire}
                 disabled={retireLoading}
               >
-                {retireLoading ? "Retiring…" : "Confirm Retirement"}
+                {retireLoading ? "Retiring Policy…" : "Confirm Retire"}
               </button>
             </footer>
           </div>
         </div>
       )}
+
+      {/* Add Document Modal */}
+      {showAddModal && (
+        <AddDocumentModal
+          close={() => setShowAddModal(false)}
+          onAdded={() => {
+            setShowAddModal(false);
+            loadDocuments();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddDocumentModal({ close, onAdded }) {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef(null);
+
+  function handleFile(file) {
+    if (!file) return;
+    if (!file.name.endsWith(".md") && !file.name.endsWith(".txt")) {
+      setError("Please select a Markdown (.md) or Text (.txt) file.");
+      return;
+    }
+    setSelectedFile(file);
+    setError("");
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    handleFile(file);
+  }
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      setError("Please select or drop a Markdown file to upload.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const result = await api.addDocument(selectedFile);
+      if (result.status === "created_metadata_only") {
+        setError(
+          `Document registered but indexing had warnings: ${result.warning || "Check vector service"}`
+        );
+        return;
+      }
+      onAdded();
+    } catch (err) {
+      setError(err.message || "Failed to upload and ingest document.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bk-modal-backdrop" role="dialog" aria-modal="true">
+      <div className="bk-modal-card bk-modal-card-lg">
+        <header className="bk-modal-header">
+          <div>
+            <span className="bk-section-tag">Knowledge Ingestion</span>
+            <h2>Register New Document</h2>
+          </div>
+          <button type="button" className="bk-modal-close" onClick={close} aria-label="Close dialog">
+            ×
+          </button>
+        </header>
+
+        <form onSubmit={submit}>
+          <div className="bk-modal-body">
+            {/* Dropzone area */}
+            <div
+              className={`bk-dropzone ${isDragging ? "active" : ""} ${
+                selectedFile ? "has-file" : ""
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  fileInputRef.current?.click();
+                }
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".md,.txt"
+                style={{ display: "none" }}
+                onChange={(e) => handleFile(e.target.files?.[0])}
+              />
+
+              {selectedFile ? (
+                <div className="bk-file-selected-box">
+                  <div className="bk-file-icon">MD</div>
+                  <div className="bk-file-info">
+                    <strong className="bk-file-name">{selectedFile.name}</strong>
+                    <span className="bk-file-size tabular-nums">
+                      {(selectedFile.size / 1024).toFixed(1)} KB · Click to replace file
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="bk-file-remove-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFile(null);
+                    }}
+                    title="Remove file"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <div className="bk-dropzone-content">
+                  <div className="bk-dropzone-icon">
+                    <span className="bk-upload-arrow">↑</span>
+                  </div>
+                  <strong className="bk-dropzone-title">
+                    Drop Markdown document here, or browse files
+                  </strong>
+                  <span className="bk-dropzone-sub">
+                    Accepts Markdown (.md) documents with YAML frontmatter
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Frontmatter Guidance Callout */}
+            <div className="bk-frontmatter-guidance">
+              <strong className="bk-guidance-title">Frontmatter Specifications</strong>
+              <p>
+                Document ID, Title, Access Tier (<code className="bk-code-inline">public</code>,{" "}
+                <code className="bk-code-inline">internal</code>, or{" "}
+                <code className="bk-code-inline">restricted</code>), Version, and Effective Date are
+                extracted automatically from the YAML frontmatter.
+              </p>
+              <pre className="bk-code-block">
+{`---
+doc_id: "doc_010"
+title: "Retail Account Wire Transfer Procedures"
+access_level: "internal"
+version: "v1.0"
+effective_date: "2026-10-01"
+---`}
+              </pre>
+            </div>
+
+            {error && (
+              <div className="bk-alert-banner" role="alert" style={{ marginTop: 14 }}>
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+
+          <footer className="bk-modal-footer">
+            <button
+              type="button"
+              className="bk-btn-secondary"
+              onClick={close}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="bk-btn-primary"
+              disabled={submitting || !selectedFile}
+            >
+              {submitting ? "Parsing & Ingesting…" : "Upload & Ingest Document"}
+            </button>
+          </footer>
+        </form>
+      </div>
     </div>
   );
 }

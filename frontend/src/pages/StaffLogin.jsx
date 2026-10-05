@@ -10,6 +10,7 @@ export default function StaffLogin() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -72,13 +73,22 @@ export default function StaffLogin() {
           </div>
 
           <div className="bk-field-group">
-            <label htmlFor="staff-password" className="bk-label">
-              Account Password
-            </label>
+            <div className="bk-label-row">
+              <label htmlFor="staff-password" className="bk-label">
+                Account Password
+              </label>
+              <button
+                type="button"
+                className="bk-btn-text"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
             <input
               id="staff-password"
               className="bk-input"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
@@ -106,7 +116,7 @@ export default function StaffLogin() {
               onClick={() => fillDemo("demo_employee", "DemoEmp123!")}
             >
               <span className="bk-demo-role employee">Employee</span>
-              <span className="bk-demo-u">demo_employee</span>
+              <span className="bk-demo-u tabular-nums">demo_employee</span>
               <span className="bk-demo-tier">Tier: Internal</span>
             </button>
             <button
@@ -115,7 +125,7 @@ export default function StaffLogin() {
               onClick={() => fillDemo("demo_compliance", "DemoComp123!")}
             >
               <span className="bk-demo-role compliance">Compliance</span>
-              <span className="bk-demo-u">demo_compliance</span>
+              <span className="bk-demo-u tabular-nums">demo_compliance</span>
               <span className="bk-demo-tier">Tier: Restricted</span>
             </button>
           </div>

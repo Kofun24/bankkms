@@ -181,7 +181,7 @@ export default function CustomerChat() {
                     <div className="bk-user-bubble">
                       <div className="bk-user-header">
                         <span className="bk-sender-label">Your Question</span>
-                        <span className="bk-msg-time">{msg.timestamp}</span>
+                        <time className="bk-msg-time">{msg.timestamp}</time>
                       </div>
                       <div className="bk-user-text">{msg.text}</div>
                     </div>
@@ -194,7 +194,7 @@ export default function CustomerChat() {
 
             {sending && (
               <div className="bk-stream-row assistant">
-                <div className="bk-typing-indicator" aria-label="Thinking">
+                <div className="bk-typing-indicator" aria-label="Processing verified response">
                   <span className="bk-typing-dot"></span>
                   <span className="bk-typing-dot"></span>
                   <span className="bk-typing-dot"></span>
@@ -235,8 +235,8 @@ export default function CustomerChat() {
             </div>
             <div className="bk-input-footnote">
               <span>
-                Anonymous visitor session ({sessionId ? sessionId.slice(0, 8) : "connecting…"}
-                ). Session history is not stored across visits.
+                Anonymous visitor session ({sessionId ? sessionId.slice(0, 8) : "connecting…"}).
+                Session history is not stored across visits.
               </span>
               <a href="/staff" className="bk-footnote-link">
                 Staff Portal
@@ -250,14 +250,15 @@ export default function CustomerChat() {
 }
 
 /**
- * Explicit visual treatments for the 4 pipeline statuses:
- * - "answered"
- * - "needs_clarification"
- * - "denied"
- * - "escalated"
+ * Visual treatments for the 4 pipeline statuses:
+ * - "answered": Verified & grounded answer with citations and copy button
+ * - "needs_clarification": Interactive follow-up prompt
+ * - "denied": Access boundary denial or no evidence found
+ * - "escalated": Flagged for human review handoff
  */
 function AssistantResponseCard({ message }) {
   const { status, text, final_response, timestamp } = message;
+  const [copied, setCopied] = useState(false);
 
   // Extract citations if present
   const citations =
@@ -272,6 +273,13 @@ function AssistantResponseCard({ message }) {
       text.toLowerCase().includes("restricted") ||
       text.toLowerCase().includes("internal"));
 
+  const handleCopy = () => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <article className={`bk-response-card status-${status}`}>
       {/* 1. STATUS: ANSWERED */}
@@ -282,13 +290,23 @@ function AssistantResponseCard({ message }) {
               <span className="bk-status-pill answered">Verified &amp; Grounded</span>
               <span className="bk-status-caption">Sourced from Official Documentation</span>
             </div>
-            <time className="bk-msg-time">{timestamp}</time>
+            <div className="bk-header-meta-group">
+              <button
+                type="button"
+                className="bk-btn-text bk-copy-answer-btn"
+                onClick={handleCopy}
+                title="Copy answer text to clipboard"
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+              <time className="bk-msg-time">{timestamp}</time>
+            </div>
           </div>
 
           <div className="bk-card-body">
             <div className="bk-answer-text">{text}</div>
 
-            {/* Citations as first-class UI elements with proper typographic weight */}
+            {/* Citations as first-class UI elements */}
             {citations.length > 0 && (
               <section className="bk-citations-section">
                 <h3 className="bk-citations-heading">Cited Knowledge Sources</h3>
@@ -296,13 +314,21 @@ function AssistantResponseCard({ message }) {
                   {citations.map((cite, idx) => (
                     <div key={idx} className="bk-citation-item">
                       <div className="bk-citation-top">
-                        <span className="bk-citation-doc">{cite.doc_title}</span>
+                        <strong className="bk-citation-doc">{cite.doc_title}</strong>
                         {cite.doc_id && (
                           <span className="bk-citation-id tabular-nums">{cite.doc_id}</span>
                         )}
                       </div>
                       <div className="bk-citation-meta">
                         <span className="bk-citation-section">{cite.section}</span>
+                        {cite.version && (
+                          <span className="bk-cite-meta-pill tabular-nums">v{cite.version}</span>
+                        )}
+                        {cite.effective_date && (
+                          <span className="bk-cite-meta-pill tabular-nums">
+                            {cite.effective_date}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -328,8 +354,8 @@ function AssistantResponseCard({ message }) {
             <div className="bk-clarify-callout">
               <p className="bk-clarify-prompt">{text}</p>
               <p className="bk-clarify-hint">
-                Please reply with additional details or specify which product or transaction type
-                you are referring to.
+                Please reply with additional details or specify which product, account type, or
+                transaction scenario you are referring to.
               </p>
             </div>
           </div>
@@ -364,8 +390,8 @@ function AssistantResponseCard({ message }) {
                   </p>
                 ) : (
                   <p>
-                    For specific account assistance, please contact your nearest branch or official
-                    customer telephone banking representative.
+                    For specific account assistance, please visit your nearest branch or contact
+                    customer telephone banking representatives.
                   </p>
                 )}
               </div>

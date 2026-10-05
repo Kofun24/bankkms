@@ -205,8 +205,6 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: var(--radius-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .bk-tier-pill.public {
@@ -605,8 +603,6 @@
 .bk-sender-label {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: #94a3b8;
 }
 
@@ -652,8 +648,6 @@
   padding: 3px 8px;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   border-radius: var(--radius-xs);
 }
 
@@ -707,8 +701,6 @@
 .bk-citations-heading {
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--bk-text-secondary);
   margin: 0 0 10px;
 }
@@ -952,8 +944,6 @@
   display: inline-block;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--bk-text-muted);
   margin-bottom: 8px;
 }
@@ -984,8 +974,6 @@
 .bk-demo-title {
   font-size: 11.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--bk-text-muted);
   margin: 0 0 10px;
 }
@@ -1021,7 +1009,6 @@
 .bk-demo-role {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
   margin-bottom: 2px;
 }
 
@@ -1131,7 +1118,6 @@
 .bk-role-tag {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
   padding: 1px 6px;
   border-radius: var(--radius-xs);
 }
@@ -1177,8 +1163,6 @@
 .bk-tier-badge {
   font-size: 11.5px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .bk-tier-badge.internal {
@@ -1227,8 +1211,6 @@
   padding: 10px 14px 6px;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--bk-text-muted);
 }
 
@@ -1533,8 +1515,6 @@
 .bk-quick-label {
   font-size: 11.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--bk-text-muted);
 }
 
@@ -1629,15 +1609,11 @@
   font-size: 11px;
   font-weight: 500;
   color: #9ca3af;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .bk-sidebar-section-label {
   font-size: 10.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: #6b7280;
   margin-bottom: 8px;
   padding-left: 8px;
@@ -1691,8 +1667,6 @@
 .bk-guardrail-title {
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: #e5e7eb;
   margin-bottom: 4px;
 }
@@ -1721,7 +1695,6 @@
 .bk-admin-badge {
   font-size: 10.5px;
   font-weight: 700;
-  text-transform: uppercase;
   padding: 2px 6px;
   background-color: #374151;
   color: #f3f4f6;
@@ -1815,8 +1788,6 @@
   display: block;
   font-size: 11.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--bk-text-muted);
   margin-bottom: 4px;
 }
@@ -1849,8 +1820,6 @@
 .bk-date-label {
   font-size: 10.5px;
   color: var(--bk-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .bk-date-value {
@@ -1886,8 +1855,6 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--bk-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .bk-metric-tag {
@@ -2060,8 +2027,6 @@
 .bk-gov-banner-badge {
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--bk-text-muted);
   margin-bottom: 6px;
 }
@@ -2106,8 +2071,6 @@
   border-bottom: 1px solid var(--bk-border);
   font-size: 11.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--bk-text-secondary);
 }
 
@@ -2253,8 +2216,6 @@
   display: inline-block;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   padding: 2px 8px;
   border-radius: var(--radius-xs);
   background-color: #eff6ff;
@@ -2391,7 +2352,6 @@
   display: block;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
   color: var(--bk-text-muted);
   margin-bottom: 4px;
 }
@@ -2407,7 +2367,6 @@
   padding: 2px 6px;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
   background-color: var(--bk-surface-subtle);
   border: 1px solid var(--bk-border);
   border-radius: var(--radius-xs);
@@ -2553,4 +2512,301 @@
     border-right: none;
     border-bottom: 1px solid var(--bk-border);
   }
+}
+
+/* --------------------------------------------------------------------------
+   6. Extended Institutional Modules: Knowledge Ingestion & Audit Inspector
+   -------------------------------------------------------------------------- */
+
+/* Dropzone & Document Upload */
+.bk-dropzone {
+  border: 1.5px dashed var(--bk-border-strong);
+  border-radius: var(--radius-md);
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  background-color: var(--bk-surface);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  outline: none;
+}
+
+.bk-dropzone:hover,
+.bk-dropzone.active {
+  border-color: var(--bk-tier-public);
+  background-color: var(--bk-tier-public-bg);
+}
+
+.bk-dropzone.has-file {
+  border-style: solid;
+  border-color: var(--bk-border);
+  background-color: var(--bk-surface-subtle);
+  padding: 16px;
+}
+
+.bk-dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.bk-dropzone-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bk-surface-subtle);
+  border: 1px solid var(--bk-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.bk-upload-arrow {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--bk-text);
+}
+
+.bk-dropzone-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--bk-text);
+}
+
+.bk-dropzone-sub {
+  font-size: 12.5px;
+  color: var(--bk-text-secondary);
+}
+
+.bk-file-selected-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.bk-file-icon {
+  width: 38px;
+  height: 38px;
+  background-color: var(--bk-text);
+  color: var(--bk-text-inverse);
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.bk-file-info {
+  flex: 1;
+}
+
+.bk-file-name {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--bk-text);
+}
+
+.bk-file-size {
+  display: block;
+  font-size: 12px;
+  color: var(--bk-text-muted);
+}
+
+.bk-file-remove-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--bk-text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+}
+
+.bk-file-remove-btn:hover {
+  color: var(--bk-status-denied);
+  background-color: var(--bk-status-denied-bg);
+}
+
+.bk-frontmatter-guidance {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background-color: var(--bk-surface-subtle);
+  border: 1px solid var(--bk-border);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--bk-text-secondary);
+}
+
+.bk-frontmatter-guidance .bk-guidance-title {
+  display: block;
+  font-weight: 600;
+  color: var(--bk-text);
+  margin-bottom: 4px;
+  font-size: 12.5px;
+}
+
+.bk-frontmatter-guidance p {
+  margin: 0 0 6px;
+  line-height: 1.45;
+}
+
+.bk-code-block {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  background-color: var(--bk-surface);
+  border: 1px solid var(--bk-border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--bk-text);
+  overflow-x: auto;
+}
+
+.bk-code-inline {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background-color: var(--bk-surface-subtle);
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--bk-border);
+}
+
+/* Modals */
+.bk-modal-card-lg {
+  max-width: 620px;
+}
+
+/* Copy Buttons */
+.bk-copy-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--bk-border);
+  background-color: var(--bk-surface);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  color: var(--bk-text-secondary);
+  transition: all 0.15s ease;
+}
+
+.bk-copy-btn:hover {
+  background-color: var(--bk-surface-subtle);
+  color: var(--bk-text);
+}
+
+.bk-copy-answer-btn {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border: 1px solid var(--bk-border);
+  border-radius: var(--radius-xs);
+  background-color: var(--bk-surface);
+  color: var(--bk-text-secondary);
+  cursor: pointer;
+}
+
+.bk-copy-answer-btn:hover {
+  background-color: var(--bk-surface-subtle);
+  color: var(--bk-text);
+}
+
+.bk-header-meta-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bk-header-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Consultation History Search */
+.bk-history-search-box {
+  padding: 6px 12px 10px;
+}
+
+.bk-history-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--bk-border);
+  border-radius: var(--radius-xs);
+  background-color: var(--bk-surface);
+  color: var(--bk-text);
+}
+
+.bk-history-search-input:focus {
+  outline: none;
+  border-color: var(--bk-tier-internal);
+}
+
+/* Audit Table & Inspector */
+.bk-clickable-row {
+  cursor: pointer;
+}
+
+.bk-clickable-row:hover td {
+  background-color: #f1f4f9 !important;
+}
+
+.bk-ledger-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.bk-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bk-detail-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bk-text-muted);
+}
+
+.bk-detail-val {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bk-text);
+}
+
+.bk-copyable-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bk-callout-panel {
+  padding: 12px 14px;
+  background-color: var(--bk-surface-subtle);
+  border: 1px solid var(--bk-border);
+  border-radius: var(--radius-xs);
+  font-size: 13.5px;
+  color: var(--bk-text);
+  line-height: 1.5;
+}
+
+.bk-hash-box {
+  flex: 1;
+  padding: 6px 10px;
+  background-color: var(--bk-surface-subtle);
+  border: 1px solid var(--bk-border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  word-break: break-all;
+  color: var(--bk-text);
 }

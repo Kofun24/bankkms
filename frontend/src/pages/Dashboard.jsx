@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 
@@ -7,15 +7,42 @@ export default function Dashboard() {
   const [documents, setDocuments] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+
+  const loadData = useCallback(async () => {
+    setRefreshing(true);
+    setError("");
+
+    try {
+      const [statsData, docsData, logData] = await Promise.all([
+        api.getDashboardStats().catch(() => null),
+        api.listDocuments(false).catch(() => []),
+        api.getAuditLog(6).catch(() => []),
+      ]);
+
+      if (statsData) setStats(statsData);
+      setDocuments(docsData.slice(0, 5));
+      setAuditLog(logData);
+    } catch (err) {
+      setError(err.message || "Failed to load dashboard statistics.");
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     let ignore = false;
-    Promise.all([api.getDashboardStats(), api.listDocuments(false)])
-      .then(([statsData, docsData]) => {
+    Promise.all([
+      api.getDashboardStats().catch(() => null),
+      api.listDocuments(false).catch(() => []),
+      api.getAuditLog(6).catch(() => []),
+    ])
+      .then(([statsData, docsData, logData]) => {
         if (!ignore) {
-          setStats(statsData);
+          if (statsData) setStats(statsData);
           setDocuments(docsData.slice(0, 5));
+          setAuditLog(logData);
           setLoading(false);
         }
       })
@@ -24,15 +51,6 @@ export default function Dashboard() {
           setError(err.message || "Failed to load dashboard statistics.");
           setLoading(false);
         }
-      });
-
-    api
-      .getAuditLog(5)
-      .then((logData) => {
-        if (!ignore) setAuditLog(logData);
-      })
-      .catch(() => {
-        if (!ignore) setAuditLog([]);
       });
 
     return () => {
@@ -47,6 +65,20 @@ export default function Dashboard() {
     year: "numeric",
   });
 
+  const formatTierLabel = (tier) => {
+    if (!tier) return "";
+    return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
+  };
+
+  const formatStageLabel = (stage) => {
+    if (!stage) return "Unknown";
+    return stage
+      .replace(/_/g, " ")
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+  };
+
   return (
     <div className="bk-admin-page">
       {/* Header bar */}
@@ -58,9 +90,20 @@ export default function Dashboard() {
             Operational status of BankKMS accounts, knowledge documents, and verification integrity.
           </p>
         </div>
-        <div className="bk-date-badge tabular-nums">
-          <span className="bk-date-label">Audit Cycle Date</span>
-          <span className="bk-date-value">{today}</span>
+        <div className="bk-header-actions-group">
+          <button
+            type="button"
+            className="bk-btn-secondary"
+            onClick={() => loadData(true)}
+            disabled={loading || refreshing}
+            title="Refresh live metrics"
+          >
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+          <div className="bk-date-badge tabular-nums">
+            <span className="bk-date-label">Audit Cycle Date</span>
+            <span className="bk-date-value">{today}</span>
+          </div>
         </div>
       </div>
 
@@ -139,14 +182,16 @@ export default function Dashboard() {
             {documents.length > 0 ? (
               <div className="bk-dense-list">
                 {documents.map((doc) => (
-                  <div key={doc.id} className="bk-dense-row">
+                  <div key={doc.id || doc.doc_id} className="bk-dense-row">
                     <div className="bk-dense-col-main">
                       <strong className="bk-doc-title">{doc.title}</strong>
-                      <span className="bk-doc-version tabular-nums">Version: {doc.version}</span>
+                      <span className="bk-doc-version tabular-nums">
+                        Version {doc.version} · <code className="bk-code-inline">{doc.doc_id}</code>
+                      </span>
                     </div>
                     <div className="bk-dense-col-badges">
                       <span className={`bk-tier-pill ${doc.access_level.toLowerCase()}`}>
-                        {doc.access_level}
+                        {formatTierLabel(doc.access_level)}
                       </span>
                       <span
                         className={`bk-status-indicator-tag ${
@@ -188,7 +233,7 @@ export default function Dashboard() {
                 {auditLog.map((entry) => (
                   <div key={entry.id} className="bk-audit-event-item">
                     <div className="bk-event-header">
-                      <span className="bk-stage-tag">{entry.stage.replace("_", " ")}</span>
+                      <span className="bk-stage-tag">{formatStageLabel(entry.stage)}</span>
                       <time className="bk-event-time tabular-nums">
                         {new Date(entry.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -199,9 +244,11 @@ export default function Dashboard() {
                     </div>
                     <div className="bk-event-summary">{entry.decision_summary}</div>
                     <div className="bk-event-hash-row">
-                      <span className="bk-hash-label">Hash:</span>
+                      <span className="bk-hash-label">Block:</span>
                       <span className="bk-hash-value tabular-nums">
-                        {entry.immutable_hash ? entry.immutable_hash.slice(0, 16) + "…" : "—"}
+                        {entry.immutable_hash
+                          ? entry.immutable_hash.slice(0, 16) + "…"
+                          : `#${entry.id} · ${entry.agent}`}
                       </span>
                     </div>
                   </div>
