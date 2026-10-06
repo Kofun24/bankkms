@@ -116,6 +116,7 @@ evaluates whether a case requires human review.
   Agent 6                             Evaluates escalation conditions and
                                       routes uncertain or high-risk cases
                                       for human review.
+
   -----------------------------------------------------------------------
 
 ## Access Model
@@ -498,28 +499,23 @@ Primary agent ownership was:
   -----------------------------------------------------------------------
   Team Member                         Primary Agent Contribution
   ----------------------------------- -----------------------------------
-  Member 1                            Agent 1 --- Classification & Access
+  Tharushi Karunarathne               Agent 1 --- Classification & Access
                                       Control; Agent 5 --- Audit &
                                       Compliance Logging
 
-  Member 2                            Agent 2 --- Knowledge Retrieval;
+  Hirusha Hapuarachchi                Agent 2 --- Knowledge Retrieval;
                                       Agent 6 --- Escalation & Human
                                       Handoff
 
-  Member 3                            Agent 3 --- Knowledge Analysis &
+  Hirun Rajapaksha                    Agent 3 --- Knowledge Analysis &
                                       Response; Agent 6 --- Escalation &
                                       Human Handoff
 
-  Member 4                            Agent 4 --- Verification &
+  Wenura Wickramarathne               Agent 4 --- Verification &
                                       Governance; Agent 5 --- Audit &
                                       Compliance Logging
+
   -----------------------------------------------------------------------
-
-Agent 5 was jointly developed by Members 1 and 4. Agent 6 was jointly
-developed by Members 2 and 3.
-
-Replace `Member 1`--`Member 4` with the final contributor names before
-submission.
 
 ## Responsible Use
 
