@@ -1,111 +1,143 @@
+/* BankKMS Design System Tokens & Base Stylesheet */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* 1. Neutral Surfaces & Structural Borders */
+  --bk-bg: #f8f9fa;
+  --bk-surface: #ffffff;
+  --bk-surface-subtle: #f1f3f5;
+  --bk-border: #dce1e6;
+  --bk-border-strong: #9ca3af;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* 2. Primary Editorial Ink */
+  --bk-text: #111827;
+  --bk-text-secondary: #4b5563;
+  --bk-text-muted: #6b7280;
+  --bk-text-inverse: #ffffff;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* 3. The Trust Ladder: Access Tiers */
+  /* Public: Universal customer baseline */
+  --bk-tier-public: #1d4ed8;
+  --bk-tier-public-bg: #eff6ff;
+  --bk-tier-public-border: #bfdbfe;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  /* Internal: Standard employee operational boundary */
+  --bk-tier-internal: #0f766e;
+  --bk-tier-internal-bg: #f0fdfa;
+  --bk-tier-internal-border: #99f6e4;
+
+  /* Restricted: Solemn regulatory & compliance audit tier */
+  --bk-tier-restricted: #9a3412;
+  --bk-tier-restricted-bg: #fff7ed;
+  --bk-tier-restricted-border: #fed7aa;
+
+  /* 4. Pipeline Verification Status Tokens */
+  --bk-status-answered: #065f46;
+  --bk-status-answered-bg: #ecfdf5;
+  --bk-status-answered-border: #a7f3d0;
+
+  --bk-status-clarify: #92400e;
+  --bk-status-clarify-bg: #fffbeb;
+  --bk-status-clarify-border: #fde68a;
+
+  --bk-status-denied: #991b1b;
+  --bk-status-denied-bg: #fef2f2;
+  --bk-status-denied-border: #fecaca;
+
+  --bk-status-escalated: #3730a3;
+  --bk-status-escalated-bg: #eef2ff;
+  --bk-status-escalated-border: #c7d2fe;
+
+  /* 5. Typography */
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* 6. Precision Geometry & Shadows */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --shadow-hairline: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-elevation: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--bk-bg);
+  color: var(--bk-text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tabular figures for exact alignment of numbers, dates, and amounts */
+.tabular-nums,
+table,
+.stat-value,
+.citation-metadata {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Explicit, accessible keyboard focus rings */
+:focus-visible {
+  outline: 2px solid var(--bk-tier-public);
+  outline-offset: 2px;
+}
+
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+
+/* Shared utility and reset rules */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
 }
-p {
-  margin: 0;
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--bk-tier-public);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+pre,
+.code-inline {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
 }

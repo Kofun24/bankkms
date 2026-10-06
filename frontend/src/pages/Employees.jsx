@@ -4,12 +4,22 @@ import { api } from "../api";
 export default function Employees() {
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
-  const [showModal, setShowModal] = useState(false);
+  const [roleFilter, setRoleFilter] = useState("ALL");
+  const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Confirmation state
   const [confirmAction, setConfirmAction] = useState(null);
   const [actionError, setActionError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+
+  // New account form state
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState("employee");
+  const [addError, setAddError] = useState("");
+  const [addLoading, setAddLoading] = useState(false);
 
   async function loadEmployees() {
     setLoading(true);
@@ -18,19 +28,59 @@ export default function Employees() {
       setEmployees(data);
       setError("");
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Failed to load employee directory.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadEmployees();
+    let ignore = false;
+    api
+      .listEmployees()
+      .then((data) => {
+        if (!ignore) {
+          setEmployees(data);
+          setError("");
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          setError(err.message || "Failed to load employee directory.");
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
   }, []);
 
-  const filtered = employees.filter((employee) =>
-    employee.username.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = employees.filter((emp) => {
+    const matchSearch = emp.username.toLowerCase().includes(search.toLowerCase());
+    const matchRole =
+      roleFilter === "ALL" || emp.role.toLowerCase() === roleFilter.toLowerCase();
+    return matchSearch && matchRole;
+  });
+
+  async function handleAddEmployee(e) {
+    e.preventDefault();
+    setAddError("");
+    setAddLoading(true);
+
+    try {
+      await api.addEmployee(newUsername.trim(), newPassword, newRole);
+      setShowAddModal(false);
+      setNewUsername("");
+      setNewPassword("");
+      setNewRole("employee");
+      loadEmployees();
+    } catch (err) {
+      setAddError(err.message || "Failed to create user account.");
+    } finally {
+      setAddLoading(false);
+    }
+  }
 
   async function runConfirmedAction() {
     if (!confirmAction) return;
@@ -41,340 +91,369 @@ export default function Employees() {
       setConfirmAction(null);
       loadEmployees();
     } catch (err) {
-      setActionError(err.message);
+      setActionError(err.message || "Operation failed.");
     } finally {
       setActionLoading(false);
     }
   }
 
-  const askToggleStatus = (employee) => {
+  const promptToggleActive = (emp) => {
     setActionError("");
+    const willDeactivate = emp.is_active;
     setConfirmAction({
-      title: employee.is_active ? "Deactivate account?" : "Reactivate account?",
-      message: employee.is_active
-        ? `${employee.username} will no longer be able to log in. This can be reversed at any time.`
-        : `${employee.username} will be able to log in again.`,
-      confirmLabel: employee.is_active ? "Deactivate" : "Reactivate",
-      danger: employee.is_active,
+      title: willDeactivate ? "Deactivate User Account" : "Reactivate User Account",
+      message: willDeactivate
+        ? `Are you sure you want to deactivate ${emp.username}? They will immediately lose access to BankKMS sessions.`
+        : `Reactivate ${emp.username}? They will regain login access according to their ${emp.role} role.`,
+      confirmLabel: willDeactivate ? "Deactivate Account" : "Reactivate Account",
+      isDestructive: willDeactivate,
       run: () =>
-        employee.is_active
-          ? api.deactivateEmployee(employee.username)
-          : api.reactivateEmployee(employee.username),
+        willDeactivate
+          ? api.deactivateEmployee(emp.username)
+          : api.reactivateEmployee(emp.username),
     });
   };
 
-  const askChangeRole = (employee, newRole) => {
+  const promptPromoteAdmin = (emp) => {
     setActionError("");
     setConfirmAction({
-      title: `Change role to ${newRole}?`,
-      message: `${employee.username} will move from ${employee.role} to ${newRole}. ${
-        newRole === "admin"
-          ? "They will gain full system administration rights and lose knowledge-base query access."
-          : employee.role === "admin"
-            ? "They will lose administration rights."
-            : "This changes what knowledge-base tier they can access."
-      }`,
-      confirmLabel: `Change to ${newRole}`,
-      danger: employee.role === "admin" || newRole === "admin",
-      run: () => api.changeRole(employee.username, newRole),
+      title: "Promote User to System Administrator",
+      message: `${emp.username} will be granted full administrative privileges. In accordance with BankKMS separation-of-duties enforcement, they will lose knowledge-base query capabilities.`,
+      confirmLabel: "Promote to Admin",
+      isDestructive: false,
+      run: () => api.promoteEmployee(emp.username),
     });
+  };
+
+  const promptChangeRole = (emp, targetRole) => {
+    if (emp.role === targetRole) return;
+    setActionError("");
+    const targetLabel = targetRole === "compliance" ? "Compliance" : "Employee";
+    setConfirmAction({
+      title: `Change Account Role to ${targetLabel}`,
+      message: `Modify ${emp.username}'s access from ${emp.role} to ${targetRole}. This alters their knowledge access tier to ${
+        targetRole === "compliance" ? "Restricted" : "Internal"
+      }.`,
+      confirmLabel: "Apply Role Change",
+      isDestructive: false,
+      run: () => api.changeRole(emp.username, targetRole),
+    });
+  };
+
+  const formatRoleName = (role) => {
+    if (!role) return "";
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
   };
 
   return (
-    <div>
-      <div className="page-heading">
+    <div className="bk-admin-page">
+      <div className="bk-page-header">
         <div>
-          <span className="eyebrow">ACCESS MANAGEMENT</span>
-          <h1>Users</h1>
-          <p>Manage employee, compliance, and admin access to BankKMS.</p>
+          <span className="bk-section-tag">Identity &amp; Access Management</span>
+          <h1 className="bk-page-title">Employee &amp; Staff Accounts</h1>
+          <p className="bk-page-desc">
+            Manage user authorization, access tier roles, and administrative promotions across the
+            institution.
+          </p>
         </div>
-        <button className="primary-button" onClick={() => setShowModal(true)}>
-          + Add user
+        <button
+          type="button"
+          className="bk-btn-primary"
+          onClick={() => setShowAddModal(true)}
+        >
+          Add Staff Account
         </button>
       </div>
 
       {error && (
-        <div className="login-error">
-          <span>!</span>
-          {error}
+        <div className="bk-alert-banner" role="alert">
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="toolbar">
-        <div className="search-box">
-          <span>⌕</span>
+      {/* Filter and Search Bar */}
+      <div className="bk-toolbar">
+        <div className="bk-search-box">
           <input
+            className="bk-search-input"
             type="text"
-            placeholder="Search users..."
+            placeholder="Search by username…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="toolbar-info">{filtered.length} users</div>
-      </div>
-
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>USERNAME</th>
-              <th>ROLE</th>
-              <th>STATUS</th>
-              <th>ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!loading &&
-              filtered.map((employee) => (
-                <tr key={employee.id}>
-                  <td>
-                    <div className="employee-cell">
-                      <div className="employee-avatar">
-                        {employee.username.charAt(0).toUpperCase()}
-                      </div>
-                      <strong>{employee.username}</strong>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`role-badge ${employee.role}`}>
-                      {employee.role}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className={
-                        employee.is_active ? "status current" : "status retired"
-                      }
-                    >
-                      {employee.is_active ? "● ACTIVE" : "○ INACTIVE"}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="action-group">
-                      <button
-                        className={
-                          employee.is_active
-                            ? "table-action danger"
-                            : "table-action"
-                        }
-                        onClick={() => askToggleStatus(employee)}
-                      >
-                        {employee.is_active ? "Deactivate" : "Reactivate"}
-                      </button>
-
-                      <select
-                        className="role-select"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value)
-                            askChangeRole(employee, e.target.value);
-                          e.target.value = "";
-                        }}
-                      >
-                        <option value="" disabled>
-                          Change role…
-                        </option>
-                        {["employee", "compliance", "admin"]
-                          .filter((r) => r !== employee.role)
-                          .map((r) => (
-                            <option key={r} value={r}>
-                              {r.charAt(0).toUpperCase() + r.slice(1)}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-        {loading && <p style={{ padding: 20 }}>Loading...</p>}
-        {!loading && filtered.length === 0 && (
-          <p style={{ padding: 20, color: "var(--muted)" }}>No users found.</p>
-        )}
-      </div>
-
-      {showModal && (
-        <AddEmployeeModal
-          close={() => setShowModal(false)}
-          onAdded={() => {
-            setShowModal(false);
-            loadEmployees();
-          }}
-        />
-      )}
-
-      {confirmAction && (
-        <ConfirmModal
-          {...confirmAction}
-          error={actionError}
-          loading={actionLoading}
-          onCancel={() => {
-            setConfirmAction(null);
-            setActionError("");
-          }}
-          onConfirm={runConfirmedAction}
-        />
-      )}
-    </div>
-  );
-}
-
-function ConfirmModal({
-  title,
-  message,
-  confirmLabel,
-  danger,
-  error,
-  loading,
-  onCancel,
-  onConfirm,
-}) {
-  return (
-    <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 420 }}>
-        <div className="modal-header">
-          <div>
-            <span className="eyebrow">CONFIRM ACTION</span>
-            <h2>{title}</h2>
-          </div>
-          <button className="close-button" onClick={onCancel}>
-            ×
-          </button>
-        </div>
-
-        <p
-          style={{
-            fontSize: 13,
-            color: "var(--muted)",
-            lineHeight: 1.6,
-            marginBottom: error ? 16 : 28,
-          }}
-        >
-          {message}
-        </p>
-
-        {error && (
-          <div className="login-error" style={{ marginBottom: 20 }}>
-            <span>!</span>
-            {error}
-          </div>
-        )}
-
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={onCancel}
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="primary-button"
-            style={danger ? { background: "var(--red)" } : {}}
-            onClick={onConfirm}
-            disabled={loading}
-          >
-            {loading ? "Working..." : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AddEmployeeModal({ close, onAdded }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("employee");
-  const [error, setError] = useState("");
-
-  const submit = async (e) => {
-    e.preventDefault();
-    try {
-      await api.addEmployee(username, password, role);
-      onAdded();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal">
-        <div className="modal-header">
-          <div>
-            <span className="eyebrow">NEW ACCOUNT</span>
-            <h2>Add user</h2>
-          </div>
-          <button className="close-button" onClick={close}>
-            ×
-          </button>
-        </div>
-
-        <form onSubmit={submit}>
-          <div className="input-group">
-            <label>USERNAME</label>
-            <input
-              className="form-input"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </div>
-
-          <div className="input-group">
-            <label>TEMPORARY PASSWORD</label>
-            <input
-              className="form-input"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          <div className="input-group">
-            <label>ACCESS ROLE</label>
-            <select
-              className="form-input"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
+        <div className="bk-filter-group" role="group" aria-label="Role Filters">
+          {[
+            { id: "ALL", label: "All Roles" },
+            { id: "employee", label: "Employee" },
+            { id: "compliance", label: "Compliance" },
+            { id: "admin", label: "Admin" },
+          ].map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              className={`bk-filter-btn ${roleFilter === r.id ? "active" : ""}`}
+              onClick={() => setRoleFilter(r.id)}
             >
-              <option value="employee">Employee</option>
-              <option value="compliance">Compliance</option>
-            </select>
-          </div>
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          <p
-            style={{
-              fontSize: 10,
-              color: "var(--muted)",
-              marginTop: -14,
-              marginBottom: 20,
-            }}
-          >
-            Admin accounts can't be created directly — promote an existing
-            employee or compliance account instead.
-          </p>
+      {/* Table Section */}
+      <section className="bk-table-card">
+        <div className="bk-table-container">
+          <table className="bk-data-table">
+            <thead>
+              <tr>
+                <th scope="col">Username</th>
+                <th scope="col">Assigned Role</th>
+                <th scope="col">Knowledge Access Tier</th>
+                <th scope="col">Status</th>
+                <th scope="col" className="text-right">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {!loading &&
+                filtered.map((emp) => (
+                  <tr key={emp.id || emp.username}>
+                    <td>
+                      <span className="bk-cell-username tabular-nums">{emp.username}</span>
+                    </td>
+                    <td>
+                      <span className={`bk-role-badge ${emp.role}`}>
+                        {formatRoleName(emp.role)}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={`bk-tier-pill ${
+                          emp.role === "compliance"
+                            ? "restricted"
+                            : emp.role === "employee"
+                            ? "internal"
+                            : "admin"
+                        }`}
+                      >
+                        {emp.role === "compliance"
+                          ? "Restricted"
+                          : emp.role === "employee"
+                          ? "Internal"
+                          : "None (Query Denied)"}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={`bk-account-status ${emp.is_active ? "active" : "inactive"}`}
+                      >
+                        {emp.is_active ? "Active" : "Deactivated"}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <div className="bk-action-btn-group">
+                        {emp.role !== "admin" && (
+                          <button
+                            type="button"
+                            className="bk-btn-table"
+                            onClick={() => promptPromoteAdmin(emp)}
+                            title="Promote to system administrator"
+                          >
+                            Promote to Admin
+                          </button>
+                        )}
+                        {emp.role !== "admin" && (
+                          <select
+                            className="bk-select-inline"
+                            value={emp.role}
+                            onChange={(e) => promptChangeRole(emp, e.target.value)}
+                            aria-label={`Change role for ${emp.username}`}
+                          >
+                            <option value="employee">Employee</option>
+                            <option value="compliance">Compliance</option>
+                          </select>
+                        )}
+                        <button
+                          type="button"
+                          className={`bk-btn-table ${emp.is_active ? "destructive" : "constructive"}`}
+                          onClick={() => promptToggleActive(emp)}
+                        >
+                          {emp.is_active ? "Deactivate" : "Reactivate"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
 
-          {error && (
-            <div className="login-error">
-              <span>!</span>
-              {error}
+          {loading && (
+            <div className="bk-table-loading">
+              <span>Loading employee directory…</span>
             </div>
           )}
 
-          <div className="modal-actions">
-            <button type="button" className="secondary-button" onClick={close}>
-              Cancel
-            </button>
-            <button className="primary-button">Create account</button>
+          {!loading && filtered.length === 0 && (
+            <div className="bk-empty-table-state">
+              <h3>No Accounts Found</h3>
+              <p>
+                No user accounts match the current filter criteria ({search ? `search: "${search}", ` : ""}
+                role: {roleFilter}).
+              </p>
+              <button
+                type="button"
+                className="bk-btn-secondary"
+                onClick={() => {
+                  setSearch("");
+                  setRoleFilter("ALL");
+                }}
+              >
+                Reset Filters
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Add User Modal */}
+      {showAddModal && (
+        <div className="bk-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="bk-modal-card">
+            <header className="bk-modal-header">
+              <h2>Register New Staff Account</h2>
+              <button
+                type="button"
+                className="bk-modal-close"
+                onClick={() => setShowAddModal(false)}
+                aria-label="Close dialog"
+              >
+                ×
+              </button>
+            </header>
+
+            <form onSubmit={handleAddEmployee} className="bk-form">
+              <div className="bk-field-group">
+                <label htmlFor="new-emp-username" className="bk-label">
+                  Username
+                </label>
+                <input
+                  id="new-emp-username"
+                  className="bk-input"
+                  type="text"
+                  placeholder="e.g. j_smith or compliance_lead"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="bk-field-group">
+                <label htmlFor="new-emp-password" className="bk-label">
+                  Temporary Password
+                </label>
+                <input
+                  id="new-emp-password"
+                  className="bk-input"
+                  type="password"
+                  placeholder="Must contain 8+ characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="bk-field-group">
+                <label htmlFor="new-emp-role" className="bk-label">
+                  Account Role &amp; Access Tier
+                </label>
+                <select
+                  id="new-emp-role"
+                  className="bk-select"
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                >
+                  <option value="employee">Employee (Access Tier: Internal)</option>
+                  <option value="compliance">Compliance (Access Tier: Restricted)</option>
+                </select>
+                <span className="bk-field-help">
+                  Employee accounts access internal procedures; Compliance accounts access
+                  restricted AML, KYC directives, and regulatory guidelines.
+                </span>
+              </div>
+
+              {addError && (
+                <div className="bk-alert-banner" role="alert">
+                  <span>{addError}</span>
+                </div>
+              )}
+
+              <footer className="bk-modal-footer">
+                <button
+                  type="button"
+                  className="bk-btn-secondary"
+                  onClick={() => setShowAddModal(false)}
+                  disabled={addLoading}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="bk-btn-primary" disabled={addLoading}>
+                  {addLoading ? "Registering…" : "Register Account"}
+                </button>
+              </footer>
+            </form>
           </div>
-        </form>
-      </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <div className="bk-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="bk-modal-card">
+            <header className="bk-modal-header">
+              <h2>{confirmAction.title}</h2>
+              <button
+                type="button"
+                className="bk-modal-close"
+                onClick={() => setConfirmAction(null)}
+                aria-label="Close dialog"
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="bk-modal-body">
+              <p>{confirmAction.message}</p>
+              {actionError && (
+                <div className="bk-alert-banner" role="alert">
+                  <span>{actionError}</span>
+                </div>
+              )}
+            </div>
+
+            <footer className="bk-modal-footer">
+              <button
+                type="button"
+                className="bk-btn-secondary"
+                onClick={() => setConfirmAction(null)}
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`bk-btn-primary ${confirmAction.isDestructive ? "destructive" : ""}`}
+                onClick={runConfirmedAction}
+                disabled={actionLoading}
+              >
+                {actionLoading ? "Processing…" : confirmAction.confirmLabel}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

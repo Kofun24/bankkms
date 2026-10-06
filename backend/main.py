@@ -9,7 +9,6 @@ Run from the repo root:
 """
 import uuid
 import sys
-from datetime import date
 from pathlib import Path
 from typing import Optional
 from database.config import SessionLocal
@@ -17,7 +16,7 @@ from database.models import AuditLog as AuditLogModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -34,7 +33,7 @@ from agent1_classification.admin_operations import (
     admin_promote_to_admin,
     admin_reactivate_employee,
     admin_retire_document,
-)    
+)
 from agent1_classification.auth import (
     InvalidCredentialsError,
     UnauthorizedRoleError,
@@ -42,6 +41,8 @@ from agent1_classification.auth import (
     end_session,
     login as auth_login,
 )
+from agent2_retrieval.frontmatter import parse_frontmatter, MissingFrontmatterError
+from agent2_retrieval.ingest import ingest_document_by_id, DocumentNotFoundError as IngestDocNotFoundError
 from shared.enums import AccessLevel, UserRole
 
 app = FastAPI(title="BankKMS Admin API")
@@ -54,6 +55,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Documents are sorted into these folders by their frontmatter's access_level,
+# mirroring the layout under knowledge_base/ used by the bulk ingestion path.
+KNOWLEDGE_BASE_ROOT = Path(__file__).resolve().parent.parent / "knowledge_base"
+ACCESS_LEVEL_FOLDER = {
+    AccessLevel.PUBLIC: "public",
+    AccessLevel.INTERNAL: "internal",
+    AccessLevel.RESTRICTED: "restricted",
+}
 
 
 # ---------------- Helpers ----------------
@@ -190,15 +200,6 @@ def change_role(username: str, payload: ChangeRoleRequest, authorization: Option
 
 # ---------------- Documents ----------------
 
-class AddDocumentRequest(BaseModel):
-    doc_id: str
-    title: str
-    access_level: str  # "public" | "internal" | "restricted"
-    version: str
-    effective_date: date
-    file_path: str
-
-
 class DocumentResponse(BaseModel):
     id: int
     doc_id: str
@@ -222,18 +223,84 @@ def list_documents(current_only: bool = False, authorization: Optional[str] = He
 
 
 @app.post("/api/documents")
-def add_document(payload: AddDocumentRequest, authorization: Optional[str] = Header(None)):
+async def add_document(file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
+    """
+    Accepts a document file directly (multipart upload). All metadata
+    (doc_id, title, access_level, version, effective_date) is read from
+    the file's own YAML frontmatter — not from separate form fields — so
+    the file's declared access_level is always what's stored, with no
+    risk of a form dropdown disagreeing with the document's own content.
+
+    Flow: parse frontmatter -> route to knowledge_base/{access_level}/ ->
+    save file -> create Document row -> immediately chunk + embed, so the
+    document is searchable by the time this request returns.
+    """
     session_id = get_session_id(authorization)
+
+    raw_bytes = await file.read()
     try:
-        access_level = AccessLevel(payload.access_level)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid access_level: {payload.access_level!r}")
+        raw_text = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded text (e.g. .md).")
+
+    try:
+        frontmatter = parse_frontmatter(raw_text)
+    except MissingFrontmatterError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        access_level = AccessLevel(frontmatter["access_level"])
+    except (KeyError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Frontmatter access_level must be one of public/internal/restricted, "
+                   f"got {frontmatter.get('access_level')!r}",
+        )
+
+    required_fields = ["doc_id", "doc_title", "version", "effective_date"]
+    missing = [f for f in required_fields if f not in frontmatter]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Frontmatter missing required field(s): {missing}")
+
+    # Route to the correct folder purely from the file's own declared access_level.
+    folder = ACCESS_LEVEL_FOLDER[access_level]
+    dest_path = KNOWLEDGE_BASE_ROOT / folder / file.filename
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    dest_path.write_text(raw_text, encoding="utf-8")
 
     handle_common_errors(
-        admin_add_document, session_id, payload.doc_id, payload.title,
-        access_level, payload.version, payload.effective_date, payload.file_path,
+        admin_add_document,
+        session_id,
+        frontmatter["doc_id"],
+        frontmatter["doc_title"],
+        access_level,
+        str(frontmatter["version"]),
+        frontmatter["effective_date"],
+        str(dest_path),
     )
-    return {"status": "created"}
+
+    try:
+        chunks_written = ingest_document_by_id(frontmatter["doc_id"])
+    except IngestDocNotFoundError as e:
+        # Should not happen — we just created the row above — but surfaced
+        # clearly rather than silently swallowed if it somehow does.
+        raise HTTPException(status_code=500, detail=f"Document row missing immediately after creation: {e}")
+    except FileNotFoundError as e:
+        # Also shouldn't happen here since we just wrote the file ourselves,
+        # but kept as a safety net consistent with ingest_document_by_id's contract.
+        return {
+            "status": "created_metadata_only",
+            "doc_id": frontmatter["doc_id"],
+            "warning": str(e),
+        }
+
+    return {
+        "status": "created",
+        "doc_id": frontmatter["doc_id"],
+        "access_level": access_level.value,
+        "saved_to": str(dest_path),
+        "chunks_indexed": chunks_written,
+    }
 
 
 @app.post("/api/documents/{doc_id}/retire")
@@ -323,10 +390,27 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class CitationItem(BaseModel):
+    doc_id: str
+    doc_title: str
+    section: str
+    version: Optional[str] = None
+    effective_date: Optional[str] = None
+
+
+class FinalResponseData(BaseModel):
+    answer: str
+    citations: list[CitationItem] = []
+
+
 class ChatResponse(BaseModel):
     status: str
     message_to_user: str
     needs_clarification: bool = False
+    final_response: Optional[FinalResponseData] = None
+    version_conflict_detected: Optional[bool] = False
+    denial_reason: Optional[str] = None
+    access_level: Optional[str] = None
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -353,10 +437,55 @@ def chat(payload: ChatRequest):
     if "error" in result:
         raise HTTPException(status_code=400, detail=result.get("message", result["error"]))
 
+    agent4 = result.get("agent4_output")
+    agent2 = result.get("agent2_output")
+    agent1 = result.get("agent1_output")
+
+    version_lookup = {}
+    if agent2 and hasattr(agent2, "results"):
+        for chunk in agent2.results:
+            chunk_doc_id = getattr(chunk, "doc_id", None)
+            if chunk_doc_id and chunk_doc_id not in version_lookup:
+                version_lookup[chunk_doc_id] = {
+                    "version": getattr(chunk, "doc_version", None),
+                    "effective_date": getattr(chunk, "effective_date", None),
+                }
+
+    final_resp = None
+    if result.get("final_response"):
+        raw_final = result["final_response"]
+        citations_list = []
+        for c in raw_final.get("citations", []):
+            doc_id = getattr(c, "doc_id", c.get("doc_id", "") if isinstance(c, dict) else "")
+            doc_title = getattr(c, "doc_title", c.get("doc_title", "") if isinstance(c, dict) else "")
+            section = getattr(c, "section", c.get("section", "") if isinstance(c, dict) else "")
+            extra = version_lookup.get(doc_id, {})
+            citations_list.append(CitationItem(
+                doc_id=doc_id,
+                doc_title=doc_title,
+                section=section,
+                version=extra.get("version"),
+                effective_date=extra.get("effective_date"),
+            ))
+        final_resp = FinalResponseData(
+            answer=raw_final.get("answer", ""),
+            citations=citations_list,
+        )
+
+    version_conflict = getattr(agent4, "version_conflict_detected", False) if agent4 else False
+    denial_reason = getattr(agent4, "denial_reason", None) if agent4 else None
+    access_lvl = getattr(agent1, "access_level", None)
+    if hasattr(access_lvl, "value"):
+        access_lvl = access_lvl.value
+
     return ChatResponse(
         status=result.get("status", "unknown"),
         message_to_user=result.get("message_to_user", "Sorry, I couldn't process that."),
         needs_clarification=result.get("status") == "needs_clarification",
+        final_response=final_resp,
+        version_conflict_detected=bool(version_conflict),
+        denial_reason=str(denial_reason) if denial_reason else None,
+        access_level=str(access_lvl) if access_lvl else None,
     )
 
 

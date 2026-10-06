@@ -14,6 +14,7 @@ from agent4_verification.verifier import (
 
 a2 = Agent2Output(
     session_id="hallucination_check",
+    query_used="minimum balance",
     access_level="public",
     results=[
         RetrievedChunk(
