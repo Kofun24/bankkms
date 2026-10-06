@@ -499,19 +499,19 @@ Primary agent ownership was:
   -----------------------------------------------------------------------
   Team Member                         Primary Agent Contribution
   ----------------------------------- -----------------------------------
-  Tharushi Karunarathne               Agent 1 --- Classification & Access
+  Tharushi Karunarathne                Agent 1 --- Classification & Access
                                       Control; Agent 5 --- Audit &
                                       Compliance Logging
 
-  Hirusha Hapuarachchi                Agent 2 --- Knowledge Retrieval;
+  Hirusha Hapuarachchi                 Agent 2 --- Knowledge Retrieval;
                                       Agent 6 --- Escalation & Human
                                       Handoff
 
-  Hirun Rajapaksha                    Agent 3 --- Knowledge Analysis &
+  Hirun Rajapaksha                     Agent 3 --- Knowledge Analysis &
                                       Response; Agent 6 --- Escalation &
                                       Human Handoff
 
-  Wenura Wickramarathne               Agent 4 --- Verification &
+  Wenura Wickramarathne                Agent 4 --- Verification &
                                       Governance; Agent 5 --- Audit &
                                       Compliance Logging
 
